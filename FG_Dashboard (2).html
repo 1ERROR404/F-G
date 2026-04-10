@@ -1009,8 +1009,18 @@ function render(){
 // ═══════════════════════════════════════════════════════════════════
 (async()=>{
   if(!CONFIGURED){ renderSetup(); return; }
+
+  // Always render immediately with local/default data so the page is never black
+  setSyncStatus('busy', 'Connecting to SharePoint…');
   render();
-  await pullFromSharePoint();
+
+  // Then try to sync — wrapped so any error shows a message, not a black screen
+  try {
+    await pullFromSharePoint();
+  } catch(e) {
+    setSyncStatus('err', 'Could not reach SharePoint. Are you opening this file from SharePoint (not locally)?');
+    toast('Open this file from SharePoint — not from your local computer', 'err');
+  }
 })();
 </script>
 </body>
