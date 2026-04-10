@@ -1,0 +1,1028 @@
+<%@ Page Language="C#" %>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>F&G System Health Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --bg:#07090f;--surface:#0e1219;--surface2:#141821;--border:#1e2433;
+  --green:#00d98b;--yellow:#f5a623;--red:#f0413e;--blue:#3d8ef0;
+  --text:#e8eaf0;--muted:#5a6380;--dim:#2a3048;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{min-height:100%;background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:44px 44px;opacity:.3;pointer-events:none;z-index:0}
+body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 40% at 50% 0%,rgba(0,217,139,.05),transparent 70%);pointer-events:none;z-index:0}
+#root{position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column}
+
+/* topbar */
+.topbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:13px 26px;background:rgba(14,18,25,.95);border-bottom:1px solid var(--border);backdrop-filter:blur(10px);position:sticky;top:0;z-index:200}
+.brand{display:flex;align-items:center;gap:12px}
+.brand-icon{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,var(--green),#00a86b);display:flex;align-items:center;justify-content:center;font-size:19px;box-shadow:0 0 18px rgba(0,217,139,.28);flex-shrink:0}
+.brand-title{font-family:'Barlow Condensed',sans-serif;font-size:21px;font-weight:800;letter-spacing:.06em;color:#fff}
+.brand-sub{font-size:9px;color:var(--green);letter-spacing:.18em;text-transform:uppercase;margin-top:1px}
+.topbar-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+/* sync bar */
+.syncbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding:9px 26px;background:rgba(61,142,240,.05);border-bottom:1px solid rgba(61,142,240,.12);font-size:12px}
+.sync-status{display:flex;align-items:center;gap:8px;color:var(--muted)}
+.sdot{width:8px;height:8px;border-radius:50%;flex-shrink:0;transition:background .3s}
+.sdot.ok{background:var(--green);box-shadow:0 0 7px var(--green)}
+.sdot.busy{background:var(--yellow);box-shadow:0 0 7px var(--yellow);animation:pulse 1.2s infinite}
+.sdot.err{background:var(--red);box-shadow:0 0 7px var(--red)}
+.sdot.off{background:var(--muted)}
+
+/* buttons */
+.btn{cursor:pointer;border:none;font-family:'Barlow',sans-serif;font-weight:600;border-radius:8px;transition:all .15s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;letter-spacing:.01em}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--green);color:#061510;padding:7px 16px;font-size:13px}
+.btn-primary:hover{background:#00f09a;box-shadow:0 0 14px rgba(0,217,139,.3)}
+.btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:6px 13px;font-size:12px}
+.btn-secondary:hover{border-color:var(--green);color:var(--green)}
+.btn-ghost{background:var(--surface2);color:var(--muted);border:1px solid var(--border);padding:6px 13px;font-size:12px}
+.btn-blue{background:rgba(61,142,240,.1);color:var(--blue);border:1px solid rgba(61,142,240,.22);padding:4px 11px;font-size:11px;font-weight:700;border-radius:6px}
+.btn-blue:hover{background:rgba(61,142,240,.2)}
+.btn-danger{background:rgba(240,65,62,.08);color:var(--red);border:1px solid rgba(240,65,62,.22);padding:4px 11px;font-size:11px;border-radius:6px}
+.btn-danger:hover{background:rgba(240,65,62,.18)}
+.btn-green-sm{background:rgba(0,217,139,.09);color:var(--green);border:1px solid rgba(0,217,139,.22);padding:4px 11px;font-size:11px;font-weight:700;border-radius:6px}
+.btn-green-sm:hover{background:rgba(0,217,139,.18)}
+
+/* inputs */
+.inp{background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:7px 11px;font-size:13px;font-family:'Barlow',sans-serif;width:100%;outline:none;transition:border .15s}
+.inp:focus{border-color:rgba(0,217,139,.38);box-shadow:0 0 0 3px rgba(0,217,139,.06)}
+.sel{background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;font-family:'Barlow',sans-serif;cursor:pointer;outline:none}
+input[type=date]::-webkit-calendar-picker-indicator{filter:invert(.5)}
+
+/* main */
+.main{padding:22px 26px;flex:1;padding-bottom:50px}
+
+/* summary */
+.sum-row{display:flex;gap:12px;margin-bottom:22px;flex-wrap:wrap}
+.sum-card{flex:1;min-width:95px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px 18px;position:relative;overflow:hidden;transition:transform .2s}
+.sum-card:hover{transform:translateY(-2px)}
+.sum-card-bar{position:absolute;top:0;left:0;right:0;height:3px;border-radius:14px 14px 0 0}
+.sum-card-val{font-family:'Barlow Condensed',sans-serif;font-size:34px;font-weight:800;line-height:1}
+.sum-card-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-top:4px}
+.sum-card-sub{font-size:11px;font-weight:600;margin-top:3px}
+.sum-card::after{content:'';position:absolute;right:-14px;bottom:-14px;width:58px;height:58px;border-radius:50%;opacity:.07;background:var(--cc,#fff)}
+
+/* station grid */
+.st-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:13px}
+
+/* station card */
+.st-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:15px;position:relative;overflow:hidden;transition:transform .2s,box-shadow .2s,border-color .2s}
+.st-card:hover{transform:translateY(-2px);box-shadow:0 10px 36px rgba(0,0,0,.45)}
+.st-bar{position:absolute;top:0;left:0;right:0;height:3px;border-radius:14px 14px 0 0}
+.st-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+.st-name{font-weight:700;font-size:13px;color:#fff;margin-bottom:2px;line-height:1.3}
+.st-zone{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.h-chip{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;flex-shrink:0;letter-spacing:.05em}
+.st-statuses{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px}
+.st-status{background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:6px 3px;text-align:center}
+.st-status-lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px}
+.badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:.06em}
+.st-dates{display:grid;grid-template-columns:1fr 1fr;gap:5px;font-size:11px;color:var(--muted);margin-bottom:8px}
+.st-note{font-size:11px;color:var(--yellow);background:rgba(245,166,35,.07);border:1px solid rgba(245,166,35,.17);border-radius:8px;padding:6px 10px;margin-bottom:8px;line-height:1.4}
+.cl-strip{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:9px 11px;margin-bottom:10px}
+.cl-strip-top{display:flex;justify-content:space-between;align-items:center}
+.i-pill{font-size:9px;color:#ffa0a0;background:rgba(240,65,62,.07);border:1px solid rgba(240,65,62,.18);border-radius:4px;padding:1px 7px;max-width:155px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.st-actions{display:flex;gap:5px}
+
+/* table */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:14px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead tr{background:var(--surface2);border-bottom:1px solid var(--border)}
+th{padding:10px 11px;text-align:left;color:var(--muted);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.09em;white-space:nowrap}
+td{padding:9px 11px;border-bottom:1px solid rgba(30,36,51,.5);vertical-align:middle}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:rgba(255,255,255,.014)}
+
+/* controls */
+.controls{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+.tab-grp{display:flex;border:1px solid var(--border);border-radius:9px;overflow:hidden}
+.tab-btn{padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;border:none;font-family:'Barlow',sans-serif;transition:all .15s}
+
+/* form */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.form-full{grid-column:1/-1}
+.form-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;font-weight:600}
+.add-card{background:var(--surface);border:1px solid rgba(0,217,139,.18);border-radius:14px;padding:18px;margin-bottom:15px;box-shadow:0 0 22px rgba(0,217,139,.04)}
+
+/* modal */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.84);backdrop-filter:blur(6px);z-index:500;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;width:100%;max-width:730px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 28px 80px rgba(0,0,0,.65)}
+.modal-hdr{padding:15px 20px;border-bottom:1px solid var(--border);background:var(--surface2);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.modal-body{overflow-y:auto;flex:1;padding:20px}
+.hist-item{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 15px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;transition:border-color .15s}
+.hist-item:hover{border-color:rgba(0,217,139,.2)}
+.hist-item.bad{border-color:rgba(240,65,62,.18)}
+.cl-item{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 13px;margin-bottom:7px;transition:border-color .15s}
+.cl-item.fail{border-color:rgba(240,65,62,.32)}
+.cl-item-row{display:flex;align-items:center;gap:10px}
+.r-btn{border:1px solid;border-radius:6px;padding:3px 9px;font-size:10px;font-weight:700;cursor:pointer;font-family:'Barlow',sans-serif;transition:all .12s}
+.doc-row{display:flex;align-items:center;gap:10px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:9px 13px;margin-bottom:7px}
+.doc-info{flex:1;min-width:0}
+.doc-name{font-size:12px;color:#fff;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.doc-meta{font-size:10px;color:var(--muted);margin-top:2px}
+
+/* setup */
+.setup-wrap{max-width:600px;margin:50px auto;padding:0 16px}
+.setup-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:30px}
+.setup-h{font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:800;color:#fff;margin-bottom:6px}
+.step{display:flex;gap:12px;padding:14px 0;border-bottom:1px solid var(--border)}
+.step:last-child{border-bottom:none}
+.step-n{width:28px;height:28px;border-radius:50%;background:rgba(0,217,139,.12);border:1px solid rgba(0,217,139,.28);color:var(--green);font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
+.step-body h4{color:#fff;font-size:14px;margin-bottom:5px}
+.step-body p{font-size:12px;color:var(--muted);line-height:1.7}
+code{background:var(--surface2);padding:1px 6px;border-radius:4px;font-size:11px;color:var(--green)}
+.code-block{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:12px;line-height:2;color:var(--text);font-family:monospace;margin:8px 0;white-space:pre-wrap}
+
+/* notice */
+.notice{display:flex;gap:10px;background:rgba(61,142,240,.07);border:1px solid rgba(61,142,240,.18);border-radius:10px;padding:12px 15px;font-size:12px;color:#7eb3f5;line-height:1.6;margin-bottom:18px}
+.notice-green{background:rgba(0,217,139,.07);border-color:rgba(0,217,139,.18);color:var(--green)}
+
+/* misc */
+.sect-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;font-weight:600;margin-bottom:9px}
+.legend{display:flex;gap:15px;flex-wrap:wrap;font-size:10px;color:var(--muted);align-items:center;margin-top:22px;padding-top:15px;border-top:1px solid var(--border)}
+.empty{text-align:center;padding:55px 20px;color:var(--muted)}
+.empty-ico{font-size:42px;margin-bottom:12px;opacity:.45}
+#toast{position:fixed;bottom:22px;right:22px;padding:11px 20px;border-radius:10px;font-weight:600;font-size:13px;z-index:9999;display:none;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.28}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.fu{animation:fadeUp .3s ease both}
+.spin{display:inline-block;animation:spin .7s linear infinite}
+
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--surface)}
+::-webkit-scrollbar-thumb{background:var(--dim);border-radius:3px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<div id="toast"></div>
+<script>
+// ═══════════════════════════════════════════════════════════════════
+//  ▶ CONFIGURATION — Edit ONLY these two lines, then save & upload
+// ═══════════════════════════════════════════════════════════════════
+const SP_SITE_URL  = "https://thisisoq.sharepoint.com/sites/MaintenancePlanner";
+// Example: "https://contoso.sharepoint.com/sites/Instruments"
+// This is the URL you see in the browser when you're on your SharePoint site.
+// Just copy-paste it from your browser's address bar (remove any trailing page path).
+
+const SP_LIST_NAME = "FG_Dashboard";
+// This is the exact name of the SharePoint List you will create (Step 2 below).
+// ═══════════════════════════════════════════════════════════════════
+
+const CONFIGURED = SP_SITE_URL !== "" && SP_SITE_URL !== "https://YOUR-COMPANY.sharepoint.com/sites/YOUR-SITE";
+
+// ─── SharePoint REST API helpers ───────────────────────────────────
+// Uses the browser's existing SharePoint login session (cookie-based).
+// No app registration or tokens required — works because this file
+// is hosted ON SharePoint itself.
+
+async function spDigest() {
+  // Get request digest for write operations
+  const r = await fetch(`${SP_SITE_URL}/_api/contextinfo`, {
+    method: "POST",
+    headers: { Accept: "application/json;odata=nometadata" },
+    credentials: "include",
+  });
+  const j = await r.json();
+  return j.FormDigestValue;
+}
+
+async function spGet(endpoint) {
+  const r = await fetch(`${SP_SITE_URL}/_api/${endpoint}`, {
+    headers: { Accept: "application/json;odata=nometadata" },
+    credentials: "include",
+  });
+  if (!r.ok) throw new Error(`GET ${endpoint}: ${r.status}`);
+  return r.json();
+}
+
+async function spPost(endpoint, body, digest, method="POST") {
+  const headers = {
+    Accept: "application/json;odata=nometadata",
+    "Content-Type": "application/json;odata=nometadata",
+    "X-RequestDigest": digest,
+  };
+  if (method === "MERGE") {
+    headers["X-HTTP-Method"] = "MERGE";
+    headers["IF-MATCH"] = "*";
+  }
+  const r = await fetch(`${SP_SITE_URL}/_api/${endpoint}`, {
+    method: method === "MERGE" ? "POST" : method,
+    headers,
+    credentials: "include",
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) {
+    const txt = await r.text();
+    throw new Error(`${method} ${endpoint}: ${r.status} — ${txt.slice(0,200)}`);
+  }
+  if (r.status === 204) return null;
+  return r.json();
+}
+
+async function spDelete(endpoint, digest) {
+  await fetch(`${SP_SITE_URL}/_api/${endpoint}`, {
+    method: "POST",
+    headers: { "X-RequestDigest": digest, "X-HTTP-Method": "DELETE", "IF-MATCH": "*" },
+    credentials: "include",
+  });
+}
+
+// ─── List operations ────────────────────────────────────────────────
+// The SharePoint list has these columns:
+//   Title (single line)  — used as the record "key"
+//   JsonData (multi-line) — stores the full JSON blob for that record
+//
+// We use one list item per station + extra items for checklists/docs.
+
+const LIST_API = `web/lists/getbytitle('${encodeURIComponent(SP_LIST_NAME)}')`;
+
+async function listGetAll() {
+  const data = await spGet(`${LIST_API}/items?$select=Id,Title,JsonData&$top=500`);
+  return data.value;
+}
+
+async function listGetByTitle(title) {
+  const enc = encodeURIComponent(`Title eq '${title.replace(/'/g,"''")}'`);
+  const data = await spGet(`${LIST_API}/items?$select=Id,Title,JsonData&$filter=${enc}`);
+  return data.value[0] || null;
+}
+
+async function listUpsert(title, jsonData, digest) {
+  const existing = await listGetByTitle(title);
+  if (existing) {
+    await spPost(`${LIST_API}/items(${existing.Id})`, { JsonData: JSON.stringify(jsonData) }, digest, "MERGE");
+  } else {
+    await spPost(`${LIST_API}/items`, { Title: title, JsonData: JSON.stringify(jsonData) }, digest);
+  }
+}
+
+async function listDeleteByTitle(title, digest) {
+  const existing = await listGetByTitle(title);
+  if (existing) await spDelete(`${LIST_API}/items(${existing.Id})`, digest);
+}
+
+// ─── Create the list if it doesn't exist ───────────────────────────
+async function ensureList(digest) {
+  try {
+    await spGet(`${LIST_API}`);
+    // List exists — ensure JsonData column exists
+    try {
+      await spGet(`${LIST_API}/fields/getbytitle('JsonData')`);
+    } catch(e) {
+      await spPost("web/fields", { __metadata:{type:"SP.Field"}, Title:"JsonData", FieldTypeKind:3, MaxLength:131072 }, digest);
+      await spPost(`${LIST_API}/fields/getbytitle('JsonData')`, {}, digest); // add to default view
+    }
+  } catch(e) {
+    // Create list
+    await spPost("web/lists", {
+      __metadata:{type:"SP.List"}, Title: SP_LIST_NAME,
+      BaseTemplate: 100, Description: "F&G Dashboard data store"
+    }, digest);
+    // Add JsonData column (Note — multi-line text, up to 64k)
+    const listFields = await spGet(`${LIST_API}/fields`);
+    await spPost(`${SP_SITE_URL}/_api/web/lists/getbytitle('${SP_LIST_NAME}')/fields`, {
+      __metadata:{type:"SP.FieldMultiLineText"}, Title:"JsonData",
+      FieldTypeKind:3, MaxLength:131072
+    }, digest);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  DATA DEFAULTS
+// ═══════════════════════════════════════════════════════════════════
+const CL_ITEMS_DEFAULT = [
+  "Visual inspection of all detectors","Functional test – Gas detectors",
+  "Functional test – Flame detectors","Functional test – Heat detectors",
+  "Alarm panel response verified","Battery backup test","Power supply check",
+  "Cable & junction box integrity","Control panel indicators OK",
+  "Emergency shutdown linkage verified","Weatherproofing / enclosure integrity",
+  "Logbook & labeling updated",
+];
+const DEFAULT_STATIONS = [
+  {id:1, name:"STN-01 – Compressor Area",  zone:"Zone A",detector:"OK",      battery:"OK", power:"OK",   lastTest:"2025-03-15",nextTest:"2025-06-15",lastInspection:"2025-03-01",notes:""},
+  {id:2, name:"STN-02 – Wellhead Platform",zone:"Zone A",detector:"Fault",   battery:"OK", power:"OK",   lastTest:"2025-02-20",nextTest:"2025-05-20",lastInspection:"2025-02-20",notes:"CH4 detector #3 fault, under repair"},
+  {id:3, name:"STN-03 – Separator Train",  zone:"Zone B",detector:"OK",      battery:"Low",power:"OK",   lastTest:"2025-03-10",nextTest:"2025-06-10",lastInspection:"2025-03-05",notes:"Battery bank replacement scheduled"},
+  {id:4, name:"STN-04 – Pig Launcher",     zone:"Zone B",detector:"OK",      battery:"OK", power:"OK",   lastTest:"2025-03-20",nextTest:"2025-06-20",lastInspection:"2025-03-18",notes:""},
+  {id:5, name:"STN-05 – Flare KO Drum",    zone:"Zone C",detector:"Offline", battery:"OK", power:"Fault",lastTest:"2025-01-10",nextTest:"2025-04-10",lastInspection:"2025-01-10",notes:"Power supply under maintenance"},
+  {id:6, name:"STN-06 – Control Room",     zone:"Zone C",detector:"OK",      battery:"OK", power:"OK",   lastTest:"2025-03-25",nextTest:"2025-06-25",lastInspection:"2025-03-22",notes:""},
+  {id:7, name:"STN-07 – Gas Metering",     zone:"Zone D",detector:"OK",      battery:"OK", power:"OK",   lastTest:"2025-03-18",nextTest:"2025-06-18",lastInspection:"2025-03-15",notes:""},
+  {id:8, name:"STN-08 – Storage Tank Farm",zone:"Zone D",detector:"Fault",   battery:"OK", power:"OK",   lastTest:"2025-02-28",nextTest:"2025-05-28",lastInspection:"2025-02-25",notes:"Flame detector calibration needed"},
+  {id:9, name:"STN-09 – Pump Station",     zone:"Zone E",detector:"OK",      battery:"OK", power:"OK",   lastTest:"2025-03-22",nextTest:"2025-06-22",lastInspection:"2025-03-20",notes:""},
+  {id:10,name:"STN-10 – Loading Arm",      zone:"Zone E",detector:"OK",      battery:"OK", power:"Low",  lastTest:"2025-03-12",nextTest:"2025-06-12",lastInspection:"2025-03-10",notes:"UPS battery check pending"},
+  {id:11,name:"STN-11 – Utility Area",     zone:"Zone F",detector:"OK",      battery:"OK", power:"OK",   lastTest:"2025-03-28",nextTest:"2025-06-28",lastInspection:"2025-03-26",notes:""},
+  {id:12,name:"STN-12 – Manifold Header",  zone:"Zone F",detector:"OK",      battery:"Low",power:"OK",   lastTest:"2025-03-05",nextTest:"2025-06-05",lastInspection:"2025-03-02",notes:"Battery replacement Q2"},
+];
+
+// In-memory DB
+let DB = { stations: DEFAULT_STATIONS, checklists:{}, documents:{} };
+
+// ═══════════════════════════════════════════════════════════════════
+//  SYNC ENGINE
+// ═══════════════════════════════════════════════════════════════════
+// Each station saved as a separate list item: Title="station_<id>"
+// Checklists: Title="checklists_<stationId>"
+// Documents meta: Title="docs_<stationId>"
+
+let syncInfo = { status:"idle", msg:"Not synced yet", lastSync:null, user:null };
+
+function setSyncStatus(status, msg) {
+  syncInfo.status = status; syncInfo.msg = msg;
+  const bar = document.getElementById("syncbar");
+  if (bar) renderSyncBar(bar);
+}
+
+async function pullFromSharePoint() {
+  setSyncStatus("busy","Loading from SharePoint…");
+  try {
+    const items = await listGetAll();
+    const newDB = { stations:[], checklists:{}, documents:{} };
+    items.forEach(item => {
+      try {
+        const data = JSON.parse(item.JsonData || "null");
+        if (!data) return;
+        if (item.Title === "stations_all") { newDB.stations = data; }
+        else if (item.Title.startsWith("checklists_")) { const id=parseInt(item.Title.split("_")[1]); newDB.checklists[id]=data; }
+        else if (item.Title.startsWith("docs_"))       { const id=parseInt(item.Title.split("_")[1]); newDB.documents[id]=data; }
+      } catch(e) {}
+    });
+    if (newDB.stations.length > 0) DB = newDB;
+    else {
+      // First time — push defaults
+      await pushAllToSharePoint();
+    }
+    syncInfo.lastSync = new Date();
+    setSyncStatus("ok", "Synced with SharePoint · " + syncInfo.lastSync.toLocaleTimeString());
+    toast("✓ Synced with SharePoint");
+  } catch(e) {
+    setSyncStatus("err","Sync failed: " + e.message);
+    toast("Sync error: " + e.message, "err");
+    console.error(e);
+  }
+  render();
+}
+
+async function pushAllToSharePoint() {
+  const digest = await spDigest();
+  await ensureList(digest);
+  await listUpsert("stations_all", DB.stations, digest);
+  for (const [id, cl] of Object.entries(DB.checklists)) {
+    await listUpsert(`checklists_${id}`, cl, digest);
+  }
+  for (const [id, docs] of Object.entries(DB.documents)) {
+    await listUpsert(`docs_${id}`, docs, digest);
+  }
+}
+
+async function pushStations() {
+  const digest = await spDigest();
+  await ensureList(digest);
+  await listUpsert("stations_all", DB.stations, digest);
+}
+
+async function pushChecklists(stationId) {
+  const digest = await spDigest();
+  await listUpsert(`checklists_${stationId}`, DB.checklists[stationId]||[], digest);
+}
+
+async function pushDocs(stationId) {
+  const digest = await spDigest();
+  await listUpsert(`docs_${stationId}`, DB.documents[stationId]||[], digest);
+}
+
+// Auto-refresh every 45 seconds
+setInterval(async () => {
+  if (CONFIGURED && syncInfo.status !== "busy") {
+    try {
+      const items = await listGetAll();
+      items.forEach(item => {
+        try {
+          const data = JSON.parse(item.JsonData || "null");
+          if (!data) return;
+          if (item.Title === "stations_all") DB.stations = data;
+          else if (item.Title.startsWith("checklists_")) DB.checklists[parseInt(item.Title.split("_")[1])]=data;
+          else if (item.Title.startsWith("docs_"))       DB.documents[parseInt(item.Title.split("_")[1])]=data;
+        } catch(e) {}
+      });
+      syncInfo.lastSync = new Date();
+      setSyncStatus("ok","Auto-synced · " + syncInfo.lastSync.toLocaleTimeString());
+      render();
+    } catch(e) {}
+  }
+}, 45000);
+
+// ═══════════════════════════════════════════════════════════════════
+//  HEALTH LOGIC
+// ═══════════════════════════════════════════════════════════════════
+const todayMs = new Date().setHours(0,0,0,0);
+function daysUntil(d){ if(!d)return null; return Math.ceil((new Date(d)-todayMs)/86400000); }
+function getHealth(s){
+  if(s.detector==="Offline"||s.power==="Fault") return "Critical";
+  if(s.detector==="Fault"||s.battery==="Low"||s.power==="Low") return "Warning";
+  const d=daysUntil(s.nextTest); if(d!==null&&d<14) return "Warning";
+  return "Healthy";
+}
+const HCX={Healthy:"#00d98b",Warning:"#f5a623",Critical:"#f0413e"};
+const SC={OK:{c:"#00d98b",bg:"rgba(0,217,139,.12)"},Fault:{c:"#f0413e",bg:"rgba(240,65,62,.12)"},Offline:{c:"#5a6380",bg:"rgba(90,99,128,.12)"},Low:{c:"#f5a623",bg:"rgba(245,166,35,.12)"}};
+
+function bHTML(v){const c=SC[v]||SC.OK;return `<span class="badge" style="color:${c.c};background:${c.bg};border:1px solid ${c.c}33">${v.toUpperCase()}</span>`;}
+function dot(h,sz=9){return `<span style="display:inline-block;width:${sz}px;height:${sz}px;border-radius:50%;background:${HCX[h]};box-shadow:0 0 5px ${HCX[h]};margin-right:4px;flex-shrink:0;vertical-align:middle"></span>`;}
+function dTag(days){
+  if(days===null)return `<span style="color:var(--muted)">—</span>`;
+  if(days<0) return `<span style="color:var(--red);font-weight:700">${Math.abs(days)}d OVR</span>`;
+  if(days<14)return `<span style="color:var(--yellow);font-weight:600">${days}d</span>`;
+  return `<span style="color:var(--muted)">${days}d</span>`;
+}
+function fmtSize(b){if(b<1024)return b+'B';if(b<1048576)return(b/1024).toFixed(1)+'KB';return(b/1048576).toFixed(1)+'MB';}
+function docIcon(n){const e=(n.split('.').pop()||'').toLowerCase();return{pdf:'📄',doc:'📝',docx:'📝',xls:'📊',xlsx:'📊',png:'🖼️',jpg:'🖼️',jpeg:'🖼️',txt:'📋'}[e]||'📎';}
+
+// ═══════════════════════════════════════════════════════════════════
+//  TOAST
+// ═══════════════════════════════════════════════════════════════════
+function toast(msg,type='ok'){
+  const t=document.getElementById('toast');
+  const m={ok:['#00d98b','#061510'],err:['#f0413e','#fff'],warn:['#f5a623','#1a0c00']};
+  const [bg,fg]=m[type]||m.ok;
+  t.textContent=msg;t.style.background=bg;t.style.color=fg;
+  t.style.display='block';clearTimeout(t._t);t._t=setTimeout(()=>t.style.display='none',3200);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  APP STATE
+// ═══════════════════════════════════════════════════════════════════
+let S={
+  tab:'grid',filterZone:'All',filterH:'All',search:'',
+  editingId:null,editData:{},addMode:false,updater:'',
+  newStn:{name:'',zone:'Zone A',detector:'OK',battery:'OK',power:'OK',lastTest:'',nextTest:'',lastInspection:'',notes:''},
+  modal:null,clView:'history',clDetail:null,
+  clTech:'',clDate:new Date().toISOString().slice(0,10),
+  clItems:CL_ITEMS_DEFAULT.map(l=>({label:l,result:'Pass',issue:''})),
+  clNote:'',
+};
+
+// ═══════════════════════════════════════════════════════════════════
+//  EXCEL EXPORT
+// ═══════════════════════════════════════════════════════════════════
+function exportExcel(){
+  const wb=XLSX.utils.book_new();
+  const now=new Date().toLocaleDateString('en-GB');
+
+  const rows=[
+    ['F&G SYSTEM HEALTH DASHBOARD – FULL REPORT'],['Generated:',now],[],['OVERVIEW'],
+    ['Total Stations',DB.stations.length],
+    ['Healthy',DB.stations.filter(s=>getHealth(s)==='Healthy').length],
+    ['Warning',DB.stations.filter(s=>getHealth(s)==='Warning').length],
+    ['Critical',DB.stations.filter(s=>getHealth(s)==='Critical').length],
+    ['Overdue',DB.stations.filter(s=>{const d=daysUntil(s.nextTest);return d!==null&&d<0;}).length],
+    ['Due ≤14 days',DB.stations.filter(s=>{const d=daysUntil(s.nextTest);return d!==null&&d>=0&&d<=14;}).length],
+    [],[`STATION DETAILS`],
+    ['Station','Zone','Health','Detector','Battery','Power','Last Test','Next Test','Days Until Test','Last Inspection','Notes','Last CL Date','Last Tech','Fail Items','Total Inspections','Docs'],
+  ];
+  DB.stations.forEach(s=>{
+    const h=getHealth(s),d=daysUntil(s.nextTest);
+    const cl=DB.checklists[s.id]||[],last=cl.length?cl[cl.length-1]:null;
+    rows.push([s.name,s.zone,h,s.detector,s.battery,s.power,s.lastTest||'',s.nextTest||'',
+      d!==null?(d<0?`${Math.abs(d)}d OVERDUE`:`${d}d`):'-',
+      s.lastInspection||'',s.notes||'',last?last.date:'-',last?last.techName:'-',
+      last?last.failCount:'-',cl.length,(DB.documents[s.id]||[]).length]);
+  });
+  const ws1=XLSX.utils.aoa_to_sheet(rows);
+  ws1['!cols']=[{wch:30},{wch:9},{wch:11},{wch:11},{wch:11},{wch:9},{wch:12},{wch:12},{wch:16},{wch:14},{wch:35},{wch:14},{wch:18},{wch:9},{wch:12},{wch:6}];
+  XLSX.utils.book_append_sheet(wb,ws1,'Summary');
+
+  const cl2=[['CHECKLIST HISTORY'],[],['Station','Date','Technician','Pass','Fail','N/A','Note','Failed Items']];
+  DB.stations.forEach(s=>(DB.checklists[s.id]||[]).forEach(c=>{
+    const fi=c.items.filter(x=>x.result==='Fail').map(x=>x.label+(x.issue?` → ${x.issue}`:'')).join(' | ');
+    cl2.push([s.name,c.date,c.techName,c.passCount,c.failCount,c.naCount,c.overallNote||'',fi]);
+  }));
+  const ws2=XLSX.utils.aoa_to_sheet(cl2);ws2['!cols']=[{wch:28},{wch:12},{wch:18},{wch:6},{wch:6},{wch:6},{wch:35},{wch:80}];
+  XLSX.utils.book_append_sheet(wb,ws2,'Checklist History');
+
+  const iss=[['OPEN ISSUES'],[],['Station','Zone','Date','Technician','Item','Issue']];
+  DB.stations.forEach(s=>(DB.checklists[s.id]||[]).forEach(c=>c.items.filter(x=>x.result==='Fail').forEach(x=>iss.push([s.name,s.zone,c.date,c.techName,x.label,x.issue||'']))));
+  const ws3=XLSX.utils.aoa_to_sheet(iss);ws3['!cols']=[{wch:28},{wch:9},{wch:12},{wch:18},{wch:35},{wch:50}];
+  XLSX.utils.book_append_sheet(wb,ws3,'Open Issues');
+
+  const docs=[['DOCUMENTS'],[],['Station','File','Uploaded By','Date','Size']];
+  DB.stations.forEach(s=>(DB.documents[s.id]||[]).forEach(d=>docs.push([s.name,d.name,d.by||'-',d.at||'-',d.size||'-'])));
+  const ws4=XLSX.utils.aoa_to_sheet(docs);ws4['!cols']=[{wch:28},{wch:35},{wch:18},{wch:14},{wch:10}];
+  XLSX.utils.book_append_sheet(wb,ws4,'Documents');
+
+  XLSX.writeFile(wb,`FG_Report_${new Date().toISOString().slice(0,10)}.xlsx`);
+  toast('✓ Excel report downloaded');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  DOCUMENT UPLOAD  (stored as base64 in SharePoint list)
+// ═══════════════════════════════════════════════════════════════════
+function uploadDoc(stationId){
+  const inp=document.createElement('input');inp.type='file';
+  inp.accept='.pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.txt';
+  inp.onchange=async e=>{
+    const file=e.target.files[0];if(!file)return;
+    if(file.size>4*1024*1024){toast('Max 4 MB per file (SharePoint list limit)','warn');return;}
+    toast('⏳ Uploading…','warn');
+    const reader=new FileReader();
+    reader.onload=async ev=>{
+      const doc={id:Date.now(),name:file.name,size:fmtSize(file.size),type:file.type,data:ev.target.result,by:S.updater||'Team',at:new Date().toLocaleDateString('en-GB')};
+      if(!DB.documents[stationId])DB.documents[stationId]=[];
+      DB.documents[stationId].push(doc);
+      try{
+        await pushDocs(stationId);
+        toast(`✓ Uploaded: ${file.name}`);
+      }catch(err){toast('Upload failed: '+err.message,'err');}
+      renderModal();
+    };
+    reader.readAsDataURL(file);
+  };
+  inp.click();
+}
+async function deleteDoc(stationId,docId){
+  if(!confirm('Delete this document?'))return;
+  DB.documents[stationId]=(DB.documents[stationId]||[]).filter(d=>d.id!==docId);
+  try{await pushDocs(stationId);toast('Document deleted');}catch(e){toast('Delete failed','err');}
+  renderModal();
+}
+function downloadDoc(stationId,docId){
+  const doc=(DB.documents[stationId]||[]).find(d=>d.id===docId);
+  if(!doc)return;
+  // For PDFs and images — open in a new tab for preview
+  const ext=(doc.name.split('.').pop()||'').toLowerCase();
+  const previewable=['pdf','png','jpg','jpeg','gif','bmp','webp','svg'];
+  if(previewable.includes(ext)){
+    // Convert base64 data URL to a Blob URL so the browser can render it
+    const byteStr=atob(doc.data.split(',')[1]);
+    const mime=doc.data.split(',')[0].split(':')[1].split(';')[0];
+    const ab=new Uint8Array(byteStr.length);
+    for(let i=0;i<byteStr.length;i++)ab[i]=byteStr.charCodeAt(i);
+    const blob=new Blob([ab],{type:mime});
+    const url=URL.createObjectURL(blob);
+    const w=window.open(url,'_blank');
+    // Revoke the object URL after the tab has loaded to free memory
+    if(w)w.addEventListener('load',()=>URL.revokeObjectURL(url),{once:true});
+    else{
+      // Popup blocked — fall back to download
+      const a=document.createElement('a');a.href=url;a.download=doc.name;a.click();
+      setTimeout(()=>URL.revokeObjectURL(url),5000);
+    }
+  } else {
+    // For Word, Excel, txt etc — force download
+    const a=document.createElement('a');a.href=doc.data;a.download=doc.name;
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  CHECKLIST
+// ═══════════════════════════════════════════════════════════════════
+async function submitChecklist(stationId){
+  if(!S.clTech.trim()){alert('Enter technician name.');return;}
+  const entry={id:Date.now(),date:S.clDate,techName:S.clTech.trim(),
+    items:S.clItems.map(x=>({...x})),overallNote:S.clNote,
+    passCount:S.clItems.filter(x=>x.result==='Pass').length,
+    failCount:S.clItems.filter(x=>x.result==='Fail').length,
+    naCount:S.clItems.filter(x=>x.result==='NA').length};
+  if(!DB.checklists[stationId])DB.checklists[stationId]=[];
+  DB.checklists[stationId].push(entry);
+  const st=DB.stations.find(s=>s.id===stationId);
+  if(st){st.lastInspection=entry.date;st.lastTest=entry.date;}
+  try{
+    await pushChecklists(stationId);
+    await pushStations();
+    toast('✓ Inspection saved to SharePoint');
+  }catch(e){toast('Save failed: '+e.message,'err');}
+  S.clView='history';S.clTech='';S.clNote='';
+  S.clItems=CL_ITEMS_DEFAULT.map(l=>({label:l,result:'Pass',issue:''}));
+  renderModal();render();
+}
+function setClR(i,r){S.clItems[i].result=r;S.clItems[i].issue='';renderModal();}
+function setClI(i,v){S.clItems[i].issue=v;}
+
+// ═══════════════════════════════════════════════════════════════════
+//  STATION CRUD
+// ═══════════════════════════════════════════════════════════════════
+async function saveStation(){
+  const n=S.updater.trim()||'Team';
+  if(S.editingId){
+    DB.stations=DB.stations.map(s=>s.id===S.editingId?{...s,...S.editData,updatedBy:n,updatedAt:new Date().toISOString()}:s);
+    S.editingId=null;S.editData={};
+  }else{
+    if(!S.newStn.name.trim()){alert('Enter station name.');return;}
+    DB.stations.push({...S.newStn,id:Date.now(),updatedBy:n,updatedAt:new Date().toISOString()});
+    S.addMode=false;
+    S.newStn={name:'',zone:'Zone A',detector:'OK',battery:'OK',power:'OK',lastTest:'',nextTest:'',lastInspection:'',notes:''};
+  }
+  try{await pushStations();toast('✓ Station saved to SharePoint');}catch(e){toast('Save failed: '+e.message,'err');}
+  render();
+}
+function startEdit(id){const s=DB.stations.find(s=>s.id===id);S.editingId=id;S.editData={...s};render();}
+function cancelEdit(){S.editingId=null;S.editData={};render();}
+async function deleteStation(id){
+  if(!confirm('Delete this station?'))return;
+  DB.stations=DB.stations.filter(s=>s.id!==id);
+  try{await pushStations();toast('✓ Station deleted');}catch(e){toast('Delete failed','err');}
+  render();
+}
+function openModal(id){S.modal=DB.stations.find(s=>s.id===id);S.clView='history';S.clDetail=null;renderModal();}
+function closeModal(){S.modal=null;document.getElementById('modal-root').innerHTML='';}
+function patchForm(w,k,v){if(w==='new')S.newStn[k]=v;else S.editData[k]=v;}
+
+// ═══════════════════════════════════════════════════════════════════
+//  FORM HTML
+// ═══════════════════════════════════════════════════════════════════
+function formHTML(data,w){
+  const v=k=>data[k]||'';
+  const opts=k=>['OK','Fault','Offline','Low'].map(o=>`<option${v(k)===o?' selected':''}>${o}</option>`).join('');
+  return `<div class="form-grid">
+    <div class="form-full"><div class="form-lbl">Station Name</div><input class="inp" value="${v('name')}" oninput="patchForm('${w}','name',this.value)" placeholder="e.g. STN-13 – New Platform"></div>
+    <div><div class="form-lbl">Zone</div><input class="inp" value="${v('zone')}" oninput="patchForm('${w}','zone',this.value)"></div>
+    <div><div class="form-lbl">Last Test</div><input type="date" class="inp" value="${v('lastTest')}" onchange="patchForm('${w}','lastTest',this.value)"></div>
+    <div><div class="form-lbl">Next Test</div><input type="date" class="inp" value="${v('nextTest')}" onchange="patchForm('${w}','nextTest',this.value)"></div>
+    <div><div class="form-lbl">Last Inspection</div><input type="date" class="inp" value="${v('lastInspection')}" onchange="patchForm('${w}','lastInspection',this.value)"></div>
+    <div><div class="form-lbl">Detector</div><select class="inp" onchange="patchForm('${w}','detector',this.value)">${opts('detector')}</select></div>
+    <div><div class="form-lbl">Battery</div><select class="inp" onchange="patchForm('${w}','battery',this.value)">${opts('battery')}</select></div>
+    <div><div class="form-lbl">Power</div><select class="inp" onchange="patchForm('${w}','power',this.value)">${opts('power')}</select></div>
+    <div class="form-full"><div class="form-lbl">Notes</div><textarea class="inp" rows="2" oninput="patchForm('${w}','notes',this.value)">${v('notes')}</textarea></div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  MODAL
+// ═══════════════════════════════════════════════════════════════════
+function renderModal(){
+  const root=document.getElementById('modal-root');
+  if(!S.modal){root.innerHTML='';return;}
+  const s=DB.stations.find(x=>x.id===S.modal.id);
+  if(!s){root.innerHTML='';return;}
+  const hist=(DB.checklists[s.id]||[]).slice().reverse();
+  const docs=DB.documents[s.id]||[];
+  let body='';
+
+  if(S.clView==='history'){
+    const histH=hist.length===0
+      ?`<div class="empty"><div class="empty-ico">📭</div><div style="font-size:13px">No inspections yet.</div><div style="font-size:11px;margin-top:5px;color:var(--muted)">Click <strong style="color:var(--green)">+ New Check</strong> to start.</div></div>`
+      :hist.map(e=>`<div class="hist-item ${e.failCount>0?'bad':''}" onclick="openCLDetail(${e.id})">
+        <div><div style="font-weight:700;color:#fff;font-size:13px;margin-bottom:2px">${e.date}</div>
+          <div style="font-size:11px;color:var(--muted)">By <span style="color:var(--text)">${e.techName}</span></div>
+          ${e.overallNote?`<div style="font-size:10px;color:var(--yellow);margin-top:3px">📝 ${e.overallNote}</div>`:''}</div>
+        <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
+          <span style="font-size:11px;color:var(--green);background:rgba(0,217,139,.1);border:1px solid rgba(0,217,139,.22);border-radius:6px;padding:2px 9px">✓ ${e.passCount}</span>
+          ${e.failCount>0?`<span style="font-size:11px;color:var(--red);background:rgba(240,65,62,.1);border:1px solid rgba(240,65,62,.22);border-radius:6px;padding:2px 9px">✗ ${e.failCount}</span>`:''}
+          ${e.naCount>0?`<span style="font-size:11px;color:var(--muted);background:rgba(90,99,128,.1);border:1px solid rgba(90,99,128,.2);border-radius:6px;padding:2px 9px">— ${e.naCount}</span>`:''}
+          <span style="color:var(--muted);font-size:16px">›</span>
+        </div></div>`).join('');
+
+    const docsH=`<div style="margin-top:20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div class="sect-lbl" style="margin:0">📎 Documents (${docs.length})</div>
+        <button class="btn btn-primary" style="padding:5px 13px;font-size:12px" onclick="uploadDoc(${s.id})">+ Upload File</button>
+      </div>
+      ${docs.length===0?`<div style="font-size:12px;color:var(--muted);text-align:center;padding:16px;border:1px dashed var(--border);border-radius:10px">No documents yet. Upload PDF, Word, image as evidence (max 4MB each).</div>`:
+        docs.map(d=>{const ext=(d.name.split('.').pop()||'').toLowerCase();const canPreview=['pdf','png','jpg','jpeg','gif','bmp','webp','svg'].includes(ext);return `<div class="doc-row">
+          <span style="font-size:22px">${docIcon(d.name)}</span>
+          <div class="doc-info"><div class="doc-name">${d.name}</div><div class="doc-meta">${d.size} · ${d.at} · ${d.by}</div></div>
+          <div style="display:flex;gap:6px;flex-shrink:0">
+            <button class="btn btn-blue" onclick="downloadDoc(${s.id},${d.id})">${canPreview?'👁 Open':'⬇ Download'}</button>
+            <button class="btn btn-danger" onclick="deleteDoc(${s.id},${d.id})">Del</button>
+          </div></div>`;}).join('')
+    </div>`;
+    body=histH+docsH;
+
+  } else if(S.clView==='detail'&&S.clDetail){
+    const e=S.clDetail,fails=e.items.filter(x=>x.result==='Fail');
+    body=`<button onclick="S.clView='history';S.clDetail=null;renderModal()" style="background:none;color:var(--green);border:none;font-size:12px;cursor:pointer;margin-bottom:14px;font-family:inherit">← Back</button>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px">
+        ${[['Date',e.date],['Technician',e.techName],['Result',e.failCount>0?`<span style="color:var(--red);font-weight:700">${e.failCount} Issue(s)</span>`:`<span style="color:var(--green);font-weight:700">All Clear</span>`],['Pass/Fail/NA',`${e.passCount} / ${e.failCount} / ${e.naCount}`]].map(([l,v])=>`<div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:3px">${l}</div><div style="font-size:13px;font-weight:600;color:var(--text)">${v}</div></div>`).join('')}
+      </div>
+      ${fails.length>0?`<div style="background:rgba(240,65,62,.06);border:1px solid rgba(240,65,62,.18);border-radius:12px;padding:14px;margin-bottom:14px">
+        <div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:10px">⚠ Issues Found (${fails.length})</div>
+        ${fails.map(x=>`<div style="margin-bottom:8px;padding-left:12px;border-left:2px solid rgba(240,65,62,.35)"><div style="font-size:12px;color:#ffc0c0;font-weight:600">✗ ${x.label}</div>${x.issue?`<div style="font-size:11px;color:var(--red);margin-top:2px">↳ ${x.issue}</div>`:''}</div>`).join('')}</div>`:''}
+      <div class="sect-lbl">All Items</div>
+      ${e.items.map(it=>{const col=it.result==='Pass'?'var(--green)':it.result==='Fail'?'var(--red)':'var(--muted)';const ico=it.result==='Pass'?'✓':it.result==='Fail'?'✗':'—';return `<div style="display:flex;gap:9px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--border)"><span style="color:${col};font-weight:700;font-size:15px;min-width:18px;text-align:center">${ico}</span><div style="flex:1"><div style="font-size:12px;color:${it.result==='Fail'?'#ffc0c0':'var(--text)'}">${it.label}</div>${it.issue?`<div style="font-size:11px;color:var(--red);margin-top:2px">↳ ${it.issue}</div>`:''}</div><span style="font-size:10px;color:${col};background:${col}18;border:1px solid ${col}44;border-radius:5px;padding:1px 8px;flex-shrink:0">${it.result}</span></div>`;}).join('')}
+      ${e.overallNote?`<div style="margin-top:12px;background:rgba(245,166,35,.07);border:1px solid rgba(245,166,35,.18);border-radius:10px;padding:11px;font-size:12px;color:var(--yellow)">📝 <strong>Note:</strong> ${e.overallNote}</div>`:''}`;
+
+  } else if(S.clView==='new'){
+    body=`<button onclick="S.clView='history';renderModal()" style="background:none;color:var(--green);border:none;font-size:12px;cursor:pointer;margin-bottom:14px;font-family:inherit">← Cancel</button>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:16px">
+        <div><div class="form-lbl">Technician Name *</div><input class="inp" value="${S.clTech}" oninput="S.clTech=this.value" placeholder="Your name"></div>
+        <div><div class="form-lbl">Inspection Date</div><input type="date" class="inp" value="${S.clDate}" onchange="S.clDate=this.value"></div>
+      </div>
+      <div class="sect-lbl">Checklist — Pass / Fail / N/A per item</div>
+      ${S.clItems.map((it,i)=>`<div class="cl-item ${it.result==='Fail'?'fail':''}">
+        <div class="cl-item-row">
+          <span style="font-size:12px;color:var(--text);flex:1">${it.label}</span>
+          <div style="display:flex;gap:4px;flex-shrink:0">
+            ${['Pass','Fail','NA'].map(r=>{const a=it.result===r;const rc=r==='Pass'?'#00d98b':r==='Fail'?'#f0413e':'#5a6380';return `<button class="r-btn" onclick="setClR(${i},'${r}')" style="background:${a?rc:'transparent'};color:${a?'#07090f':rc};border-color:${rc}55">${r}</button>`;}).join('')}
+          </div>
+        </div>
+        ${it.result==='Fail'?`<input class="inp" style="margin-top:8px;font-size:12px" placeholder="Describe the issue / finding…" value="${it.issue||''}" oninput="setClI(${i},this.value)">`:''}
+      </div>`).join('')}
+      <div style="margin-top:13px"><div class="form-lbl">Overall Notes</div>
+        <textarea class="inp" rows="3" placeholder="General observations, corrective actions, follow-up…" oninput="S.clNote=this.value">${S.clNote}</textarea></div>
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button class="btn btn-primary" onclick="submitChecklist(${s.id})">Submit Inspection</button>
+        <button class="btn btn-ghost" onclick="S.clView='history';renderModal()">Cancel</button>
+      </div>`;
+  }
+
+  root.innerHTML=`<div class="overlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal">
+      <div class="modal-hdr">
+        <div>
+          <div style="font-size:15px;font-weight:700;color:#fff">📋 Checklist & Documents</div>
+          <div style="font-size:11px;color:var(--green);margin-top:2px">${s.name} · ${s.zone}</div>
+        </div>
+        <div style="display:flex;gap:7px">
+          ${S.clView!=='new'?`<button class="btn btn-primary" style="font-size:12px;padding:6px 13px" onclick="S.clView='new';renderModal()">+ New Check</button>`:''}
+          <button class="btn btn-ghost" style="font-size:16px;padding:5px 12px" onclick="closeModal()">✕</button>
+        </div>
+      </div>
+      <div class="modal-body">${body}</div>
+    </div>
+  </div>`;
+}
+
+function openCLDetail(id){
+  S.clDetail=(DB.checklists[S.modal.id]||[]).find(e=>e.id===id);
+  S.clView='detail';renderModal();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  SYNC BAR
+// ═══════════════════════════════════════════════════════════════════
+function renderSyncBar(bar){
+  if(!bar)return;
+  const cls=syncInfo.status==='ok'?'ok':syncInfo.status==='busy'?'busy':syncInfo.status==='err'?'err':'off';
+  bar.innerHTML=`
+    <div class="sync-status">
+      <span class="sdot ${cls}"></span>
+      <span>${syncInfo.msg}</span>
+      ${syncInfo.lastSync?`<span style="color:var(--dim)">·</span><span>Last sync: ${syncInfo.lastSync.toLocaleTimeString()}</span>`:''}
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="btn btn-primary" style="padding:5px 13px;font-size:12px" onclick="pullFromSharePoint()">
+        ${syncInfo.status==='busy'?'<span class="spin">↻</span> Syncing…':'↻ Sync Now'}
+      </button>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  SETUP SCREEN
+// ═══════════════════════════════════════════════════════════════════
+function renderSetup(){
+  document.getElementById('root').innerHTML=`
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-icon">🔥</div>
+      <div><div class="brand-title">F&G SYSTEM HEALTH</div><div class="brand-sub">Fire & Gas Monitoring Dashboard</div></div>
+    </div>
+  </div>
+  <div class="main">
+    <div class="setup-wrap">
+      <div class="setup-card fu">
+        <div class="setup-h">⚙️ Quick Setup — 3 Steps</div>
+        <p style="font-size:13px;color:var(--muted);margin:8px 0 22px;line-height:1.6">No app registration needed. This dashboard uses your existing SharePoint login. Just complete these steps once.</p>
+
+        <div class="step">
+          <div class="step-n">1</div>
+          <div class="step-body">
+            <h4>Create a SharePoint List</h4>
+            <p>Go to your SharePoint site → click <strong style="color:#fff">+ New → List</strong> → choose <strong style="color:#fff">Blank list</strong>.<br>
+            Name it exactly: <code>FG_Dashboard</code><br>
+            Then add one column: click <strong style="color:#fff">+ Add column → Multiple lines of text</strong> → name it <code>JsonData</code> → Save.</p>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-n">2</div>
+          <div class="step-body">
+            <h4>Get Your SharePoint Site URL</h4>
+            <p>Open your SharePoint site in the browser. Copy the URL up to the site name, for example:<br>
+            <code>https://yourcompany.sharepoint.com/sites/Instruments</code><br>
+            Don't include any page path after the site name.</p>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-n">3</div>
+          <div class="step-body">
+            <h4>Edit This File & Upload to SharePoint</h4>
+            <p>Open <code>FG_Dashboard.html</code> in Notepad. Find the CONFIG section near the top and change the two lines:</p>
+            <div class="code-block">const SP_SITE_URL  = "<strong>https://yourcompany.sharepoint.com/sites/Instruments</strong>";
+const SP_LIST_NAME = "FG_Dashboard";</div>
+            <p>Save the file. Upload it to your SharePoint Documents library. Share the link with your team. Everyone opens it in their browser — no login needed beyond their normal SharePoint session.</p>
+          </div>
+        </div>
+
+        <div style="margin-top:18px;background:rgba(0,217,139,.07);border:1px solid rgba(0,217,139,.18);border-radius:10px;padding:14px;font-size:12px;color:var(--green);line-height:1.7">
+          ✓ <strong>How sync works:</strong> Every save (station edit, checklist, document) writes directly to the SharePoint list. Click <strong>↻ Sync Now</strong> to pull the latest from SharePoint. Auto-refresh runs every 45 seconds. All team members see the same data in real time through their browser — no extra software needed.
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  MAIN RENDER
+// ═══════════════════════════════════════════════════════════════════
+function render(){
+  if(!CONFIGURED){renderSetup();return;}
+  const zones=['All',...Array.from(new Set(DB.stations.map(s=>s.zone))).sort()];
+  const filtered=DB.stations.filter(s=>{
+    const h=getHealth(s);
+    return(S.filterZone==='All'||s.zone===S.filterZone)&&(S.filterH==='All'||h===S.filterH)
+      &&(S.search===''||s.name.toLowerCase().includes(S.search.toLowerCase()));
+  });
+  const tot=DB.stations.length;
+  const sum={
+    total:tot,
+    healthy:DB.stations.filter(s=>getHealth(s)==='Healthy').length,
+    warning:DB.stations.filter(s=>getHealth(s)==='Warning').length,
+    critical:DB.stations.filter(s=>getHealth(s)==='Critical').length,
+    overdue:DB.stations.filter(s=>{const d=daysUntil(s.nextTest);return d!==null&&d<0;}).length,
+    soon:DB.stations.filter(s=>{const d=daysUntil(s.nextTest);return d!==null&&d>=0&&d<=14;}).length,
+  };
+
+  const sumCards=[
+    {l:'Total',v:sum.total,    c:'#3d8ef0',sub:''},
+    {l:'Healthy', v:sum.healthy, c:'#00d98b',sub:tot?`${Math.round(sum.healthy/tot*100)}% operational`:''},
+    {l:'Warning', v:sum.warning, c:'#f5a623',sub:''},
+    {l:'Critical',v:sum.critical,c:'#f0413e',sub:''},
+    {l:'Overdue Tests',v:sum.overdue,c:'#f0413e',sub:'Past due date'},
+    {l:'Due ≤14 Days', v:sum.soon,  c:'#f5a623',sub:''},
+  ].map((x,i)=>`<div class="sum-card fu" style="--cc:${x.c};animation-delay:${i*45}ms">
+    <div class="sum-card-bar" style="background:${x.c}"></div>
+    <div class="sum-card-val" style="color:${x.c}">${x.v}</div>
+    <div class="sum-card-lbl">${x.l}</div>
+    ${x.sub?`<div class="sum-card-sub" style="color:${x.c}">${x.sub}</div>`:''}
+  </div>`).join('');
+
+  const cards=filtered.map((s,i)=>{
+    const h=getHealth(s),hc=HCX[h],days=daysUntil(s.nextTest);
+    const checks=DB.checklists[s.id]||[],last=checks.length?checks[checks.length-1]:null;
+    const fails=last?last.items.filter(x=>x.result==='Fail'):[];
+    const docs=DB.documents[s.id]||[];
+
+    if(S.editingId===s.id) return `<div class="st-card fu" style="border-color:rgba(0,217,139,.28);animation-delay:${i*18}ms">
+      <div class="st-bar" style="background:var(--green)"></div>
+      <div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:11px">✏️ EDITING</div>
+      ${formHTML(S.editData,'edit')}
+      <div style="display:flex;gap:7px;margin-top:11px">
+        <button class="btn btn-primary" onclick="saveStation()">Save</button>
+        <button class="btn btn-ghost" onclick="cancelEdit()">Cancel</button>
+      </div></div>`;
+
+    const hbg=h==='Healthy'?'rgba(0,217,139,.1)':h==='Warning'?'rgba(245,166,35,.1)':'rgba(240,65,62,.1)';
+    return `<div class="st-card fu" style="border-color:${hc}18;animation-delay:${i*18}ms">
+      <div class="st-bar" style="background:${hc}"></div>
+      <div class="st-header">
+        <div style="flex:1;min-width:0;margin-right:8px">
+          <div class="st-name">${s.name}</div>
+          <div class="st-zone">${s.zone}</div>
+        </div>
+        <div class="h-chip" style="background:${hbg};color:${hc};border:1px solid ${hc}30">${dot(h,8)}${h}</div>
+      </div>
+      <div class="st-statuses">
+        ${[['Detector',s.detector],['Battery',s.battery],['Power',s.power]].map(([l,v])=>`
+          <div class="st-status"><div class="st-status-lbl">${l}</div>${bHTML(v)}</div>`).join('')}
+      </div>
+      <div class="st-dates">
+        <div>Last Test: <span style="color:var(--text)">${s.lastTest||'—'}</span></div>
+        <div>Next: <span style="color:${days!==null&&days<0?'var(--red)':days!==null&&days<14?'var(--yellow)':'var(--text)'}">${s.nextTest||'—'} ${days!==null?`(${dTag(days).replace(/<[^>]+>/g,'')})`:''}
+        </span></div>
+      </div>
+      ${s.notes?`<div class="st-note">📝 ${s.notes}</div>`:''}
+      <div class="cl-strip">
+        <div class="cl-strip-top">
+          <div>
+            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px">Last Inspection</div>
+            ${last?`<div style="font-size:12px;color:#fff;font-weight:600">${last.date}</div><div style="font-size:10px;color:var(--muted)">${last.techName}</div>`:`<div style="font-size:11px;color:var(--muted)">No inspection yet</div>`}
+          </div>
+          <div style="display:flex;gap:5px;align-items:center;flex-shrink:0">
+            ${last&&last.failCount>0?`<span style="font-size:10px;font-weight:700;color:var(--red);background:rgba(240,65,62,.1);border:1px solid rgba(240,65,62,.22);border-radius:5px;padding:2px 8px">✗ ${last.failCount}</span>`:''}
+            ${last&&last.failCount===0?`<span style="font-size:10px;font-weight:700;color:var(--green);background:rgba(0,217,139,.1);border:1px solid rgba(0,217,139,.22);border-radius:5px;padding:2px 8px">✓ Clear</span>`:''}
+            <span style="font-size:10px;color:var(--muted)">${checks.length}rec</span>
+            ${docs.length>0?`<span style="font-size:10px;color:var(--blue);background:rgba(61,142,240,.1);border:1px solid rgba(61,142,240,.2);border-radius:5px;padding:2px 7px">📎${docs.length}</span>`:''}
+          </div>
+        </div>
+        ${fails.length>0?`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">
+          ${fails.slice(0,3).map(x=>`<span class="i-pill" title="${x.label}">↳ ${x.label}</span>`).join('')}
+          ${fails.length>3?`<span style="font-size:9px;color:var(--muted)">+${fails.length-3} more</span>`:''}
+        </div>`:''}
+      </div>
+      <div class="st-actions">
+        <button class="btn btn-blue" style="flex:1" onclick="openModal(${s.id})">📋 Checklist ${checks.length>0?`(${checks.length})`:''}</button>
+        <button class="btn btn-green-sm" onclick="startEdit(${s.id})">Edit</button>
+        <button class="btn btn-danger" onclick="deleteStation(${s.id})">Del</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  const tblRows=filtered.map((s,i)=>{
+    const h=getHealth(s),hc=HCX[h],days=daysUntil(s.nextTest);
+    const checks=DB.checklists[s.id]||[],last=checks.length?checks[checks.length-1]:null;
+    const docs=DB.documents[s.id]||[];
+    return `<tr>
+      <td style="color:#fff;font-weight:600">${s.name}</td><td style="color:var(--muted)">${s.zone}</td>
+      <td>${dot(h)}<span style="color:${hc};font-weight:700;font-size:11px">${h}</span></td>
+      <td>${bHTML(s.detector)}</td><td>${bHTML(s.battery)}</td><td>${bHTML(s.power)}</td>
+      <td style="color:${days!==null&&days<0?'var(--red)':days!==null&&days<14?'var(--yellow)':'var(--text)'};white-space:nowrap">${s.nextTest||'—'}</td>
+      <td>${dTag(days)}</td>
+      <td style="font-size:11px;color:var(--muted);white-space:nowrap">${last?`${last.date} · ${last.techName}`:'—'}</td>
+      <td>${last?(last.failCount>0?`<span style="color:var(--red);font-weight:700">✗ ${last.failCount}</span>`:`<span style="color:var(--green);font-weight:700">✓</span>`):'<span style="color:var(--muted)">—</span>'}</td>
+      <td style="color:var(--blue);font-size:11px">${docs.length}</td>
+      <td><div style="display:flex;gap:5px">
+        <button class="btn btn-blue" onclick="openModal(${s.id})">📋 ${checks.length||''}</button>
+        <button class="btn btn-green-sm" onclick="startEdit(${s.id})">Edit</button>
+        <button class="btn btn-danger" onclick="deleteStation(${s.id})">Del</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('root').innerHTML=`
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-icon">🔥</div>
+      <div><div class="brand-title">F&G SYSTEM HEALTH</div><div class="brand-sub">Fire & Gas Monitoring Dashboard</div></div>
+    </div>
+    <div class="topbar-right">
+      <button class="btn btn-primary" onclick="exportExcel()">📥 Export Excel</button>
+      <input class="inp" style="width:160px;font-size:12px" placeholder="Your name (for edits)" value="${S.updater}" oninput="S.updater=this.value">
+    </div>
+  </div>
+
+  <div class="syncbar" id="syncbar"></div>
+
+  <div class="main">
+    <div class="sum-row">${sumCards}</div>
+
+    <div class="controls">
+      <input class="inp" style="width:175px" placeholder="🔍 Search stations…" value="${S.search}" oninput="S.search=this.value;render()">
+      <select class="sel" onchange="S.filterZone=this.value;render()">${zones.map(z=>`<option${S.filterZone===z?' selected':''}>${z}</option>`).join('')}</select>
+      <select class="sel" onchange="S.filterH=this.value;render()">${['All','Healthy','Warning','Critical'].map(h=>`<option${S.filterH===h?' selected':''}>${h}</option>`).join('')}</select>
+      <div class="tab-grp">
+        <button class="tab-btn" onclick="S.tab='grid';render()" style="background:${S.tab==='grid'?'rgba(0,217,139,.1)':'var(--surface2)'};color:${S.tab==='grid'?'var(--green)':'var(--muted)'};border-right:1px solid var(--border)">⊞ Grid</button>
+        <button class="tab-btn" onclick="S.tab='table';render()" style="background:${S.tab==='table'?'rgba(0,217,139,.1)':'var(--surface2)'};color:${S.tab==='table'?'var(--green)':'var(--muted)'}">☰ Table</button>
+      </div>
+      <div style="margin-left:auto"><button class="btn btn-primary" onclick="S.addMode=!S.addMode;render()">+ Add Station</button></div>
+    </div>
+
+    ${S.addMode?`<div class="add-card fu">
+      <div style="font-size:14px;font-weight:700;color:var(--green);margin-bottom:13px">New Station</div>
+      ${formHTML(S.newStn,'new')}
+      <div style="display:flex;gap:8px;margin-top:13px">
+        <button class="btn btn-primary" onclick="saveStation()">Save Station</button>
+        <button class="btn btn-ghost" onclick="S.addMode=false;render()">Cancel</button>
+      </div></div>`:''}
+
+    ${S.tab==='grid'?`<div class="st-grid">${cards}${filtered.length===0?`<div class="empty" style="grid-column:1/-1"><div class="empty-ico">🔍</div>No stations match filters.</div>`:''}</div>`:''}
+
+    ${S.tab==='table'?`<div class="tbl-wrap"><table>
+      <thead><tr><th>Station</th><th>Zone</th><th>Health</th><th>Detector</th><th>Battery</th><th>Power</th><th>Next Test</th><th>Days</th><th>Last Inspection</th><th>Issues</th><th>Docs</th><th>Actions</th></tr></thead>
+      <tbody>${tblRows}${filtered.length===0?`<tr><td colspan="12" style="text-align:center;color:var(--muted);padding:40px">No stations match.</td></tr>`:''}</tbody>
+    </table></div>`:''}
+
+    <div class="legend">
+      <span style="color:var(--text);font-weight:600">Legend:</span>
+      ${Object.entries(HCX).map(([k,c])=>`<span style="display:inline-flex;align-items:center">${dot(k)} ${k}</span>`).join('')}
+      <span style="color:var(--border)">|</span>
+      ${['OK','Fault','Offline','Low'].map(k=>bHTML(k)).join(' ')}
+    </div>
+  </div>
+  <div id="modal-root"></div>`;
+
+  renderSyncBar(document.getElementById('syncbar'));
+  if(S.modal) renderModal();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  BOOT
+// ═══════════════════════════════════════════════════════════════════
+(async()=>{
+  if(!CONFIGURED){ renderSetup(); return; }
+
+  // Always render immediately with local/default data so the page is never black
+  setSyncStatus('busy', 'Connecting to SharePoint…');
+  render();
+
+  // Then try to sync — wrapped so any error shows a message, not a black screen
+  try {
+    await pullFromSharePoint();
+  } catch(e) {
+    setSyncStatus('err', 'Could not reach SharePoint. Are you opening this file from SharePoint (not locally)?');
+    toast('Open this file from SharePoint — not from your local computer', 'err');
+  }
+})();
+</script>
+</body>
+</html>
