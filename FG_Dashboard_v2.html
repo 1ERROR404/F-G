@@ -286,22 +286,121 @@ input[type=date]::-webkit-calendar-picker-indicator { filter: invert(.5) sepia(1
 /* ══ MAIN ════════════════════════════════════════════════════════════ */
 .main { padding: 26px 28px 70px; }
 
-/* ══ KPI ROW ══════════════════════════════════════════════════════════ */
-.kpi-row { display: flex; gap: 12px; margin-bottom: 28px; flex-wrap: wrap; }
-.kpi {
-  flex: 1; min-width: 100px;
+/* ══ OVERVIEW PANEL ══════════════════════════════════════════════════ */
+.overview {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: auto auto;
+  gap: 14px;
+  margin-bottom: 28px;
+}
+@media (max-width: 1100px) { .overview { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 680px)  { .overview { grid-template-columns: 1fr; } }
+
+/* ── Hero card — system status ── */
+.ov-hero {
+  grid-column: 1 / 2;
+  grid-row: 1 / 3;
+  background: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 26px 28px;
+  position: relative; overflow: hidden;
+  display: flex; flex-direction: column; justify-content: space-between;
+  transition: background .3s, border-color .3s;
+}
+.ov-hero-glow {
+  position: absolute; inset: 0; pointer-events: none;
+  border-radius: var(--radius-xl);
+  opacity: .07;
+}
+.ov-hero-title {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: .18em; color: var(--text3);
+  margin-bottom: 10px;
+}
+.ov-status-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 14px; border-radius: 30px; border: 1px solid;
+  font-family: var(--font-mono); font-size: 12px; font-weight: 700;
+  letter-spacing: .06em; margin-bottom: 18px; width: fit-content;
+}
+.ov-status-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  animation: pulse-dot 2.2s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%,100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: .5; transform: scale(.7); }
+}
+.ov-big-num {
+  font-family: var(--font-head); font-size: 76px; font-weight: 700;
+  line-height: 1; letter-spacing: -.02em;
+}
+.ov-big-lbl {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--text3); margin-top: 4px;
+}
+.ov-bar-wrap { margin-top: 22px; }
+.ov-bar-row  { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+.ov-bar-lbl  { font-family: var(--font-mono); font-size: 10px; color: var(--text3); width: 60px; flex-shrink: 0; }
+.ov-bar-track {
+  flex: 1; height: 6px; background: var(--border);
+  border-radius: 10px; overflow: hidden;
+}
+.ov-bar-fill  { height: 100%; border-radius: 10px; transition: width .6s cubic-bezier(.4,0,.2,1); }
+.ov-bar-count { font-family: var(--font-mono); font-size: 11px; font-weight: 700; width: 22px; text-align: right; flex-shrink: 0; }
+
+/* ── Stat cards — right column ── */
+.ov-stat {
   background: var(--s1); border: 1px solid var(--border);
   border-radius: var(--radius-lg); padding: 18px 20px;
   position: relative; overflow: hidden;
-  transition: transform .22s, border-color .22s, background .3s;
+  display: flex; align-items: center; gap: 16px;
+  transition: transform .2s, border-color .2s, background .3s;
 }
-.kpi:hover { transform: translateY(-3px); border-color: var(--border2); }
-.kpi-top-bar { position: absolute; top: 0; left: 0; right: 0; height: 2px; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
-.kpi-icon { font-size: 22px; margin-bottom: 10px; display: block; }
-.kpi-val { font-family: var(--font-head); font-size: 40px; font-weight: 700; line-height: 1; letter-spacing: -.01em; }
-.kpi-lbl { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: .14em; margin-top: 5px; font-family: var(--font-mono); }
-.kpi-sub { font-size: 11px; font-weight: 600; margin-top: 4px; }
-.kpi-corner { position: absolute; right: -20px; bottom: -20px; width: 80px; height: 80px; border-radius: 50%; opacity: .05; }
+.ov-stat:hover { transform: translateY(-2px); border-color: var(--border2); }
+.ov-stat-icon {
+  width: 48px; height: 48px; border-radius: var(--radius);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; flex-shrink: 0; border: 1px solid;
+}
+.ov-stat-body { flex: 1; min-width: 0; }
+.ov-stat-val {
+  font-family: var(--font-head); font-size: 36px; font-weight: 700;
+  line-height: 1; letter-spacing: -.01em;
+}
+.ov-stat-lbl {
+  font-family: var(--font-mono); font-size: 9px; text-transform: uppercase;
+  letter-spacing: .14em; color: var(--text3); margin-top: 3px;
+}
+.ov-stat-sub { font-size: 11px; font-weight: 600; margin-top: 3px; }
+.ov-stat-accent { position: absolute; right: 0; top: 0; bottom: 0; width: 3px; border-radius: 0 var(--radius-lg) var(--radius-lg) 0; }
+
+/* ── Zone health strip ── */
+.ov-zones {
+  grid-column: 1 / -1;
+  background: var(--s1); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 16px 20px;
+  transition: background .3s;
+}
+.ov-zones-title {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .16em; color: var(--text3);
+  margin-bottom: 12px;
+}
+.ov-zone-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.ov-zone-chip {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--s2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 7px 13px;
+  flex: 1; min-width: 130px;
+  transition: border-color .2s, background .3s;
+}
+.ov-zone-chip:hover { border-color: var(--border2); }
+.ov-zone-name { font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--text2); flex: 1; }
+.ov-zone-pips { display: flex; gap: 3px; align-items: center; }
+.ov-zone-pip  { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 
 /* ══ CONTROLS ════════════════════════════════════════════════════════ */
 .controls { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
@@ -1001,23 +1100,135 @@ function render(){
     soon:    DB.stations.filter(s=>{const d=dLeft(s.nextTest);return d!==null&&d>=0&&d<=14;}).length,
   };
 
-  const kpiDef=[
-    {ico:'🏭',lbl:'Total Stations', val:sum.total,   c:'var(--blue)', x:'#60a5fa'},
-    {ico:'✅',lbl:'Healthy',         val:sum.healthy, c:'var(--green)',x:'#00e5a0', sub:tot?`${Math.round(sum.healthy/tot*100)}% operational`:''},
-    {ico:'⚠️',lbl:'Warning',         val:sum.warning, c:'var(--amber)',x:'#f59e0b'},
-    {ico:'🚨',lbl:'Critical',        val:sum.critical,c:'var(--red)',  x:'#ef4444'},
-    {ico:'⏰',lbl:'Overdue Tests',   val:sum.overdue, c:'var(--red)',  x:'#ef4444', sub:'Past due date'},
-    {ico:'📅',lbl:'Due ≤14 Days',   val:sum.soon,    c:'var(--amber)',x:'#f59e0b'},
-  ];
-  const kpis=kpiDef.map((k,i)=>`
-    <div class="kpi fu" style="animation-delay:${i*45}ms">
-      <div class="kpi-top-bar" style="background:${k.c}"></div>
-      <div class="kpi-corner" style="background:${k.x}"></div>
-      <span class="kpi-icon">${k.ico}</span>
-      <div class="kpi-val" style="color:${k.c}">${k.val}</div>
-      <div class="kpi-lbl">${k.lbl}</div>
-      ${k.sub?`<div class="kpi-sub" style="color:${k.c}">${k.sub}</div>`:''}
-    </div>`).join('');
+  // ── Overview: system status ─────────────────────────────────────
+  const healthPct = tot ? Math.round(sum.healthy/tot*100) : 0;
+  const sysStatus = sum.critical>0 ? 'CRITICAL ALERT'
+                  : sum.warning>0  ? 'WARNING ACTIVE'
+                  : 'ALL SYSTEMS OK';
+  const sysColor  = sum.critical>0 ? 'var(--red)'
+                  : sum.warning>0  ? 'var(--amber)'
+                  : 'var(--green)';
+  const sysBorder = sum.critical>0 ? 'rgba(239,68,68,.3)'
+                  : sum.warning>0  ? 'rgba(245,158,11,.3)'
+                  : 'rgba(0,229,160,.3)';
+  const sysGlow   = sum.critical>0 ? 'radial-gradient(ellipse 100% 60% at 0% 0%, rgba(239,68,68,.15), transparent)'
+                  : sum.warning>0  ? 'radial-gradient(ellipse 100% 60% at 0% 0%, rgba(245,158,11,.1), transparent)'
+                  : 'radial-gradient(ellipse 100% 60% at 0% 0%, rgba(0,229,160,.1), transparent)';
+
+  // ── Zone breakdown ───────────────────────────────────────────────
+  const zoneNames = [...new Set(DB.stations.map(s=>s.zone))].sort();
+  const zoneChips = zoneNames.map(z=>{
+    const zStas = DB.stations.filter(s=>s.zone===z);
+    const pips = zStas.map(s=>{
+      const h=hlth(s);
+      const c=h==='Healthy'?'#00e5a0':h==='Warning'?'#f59e0b':'#ef4444';
+      return `<span class="ov-zone-pip" style="background:${c};box-shadow:0 0 4px ${c}88" title="${s.name} — ${h}"></span>`;
+    }).join('');
+    const zH = zStas.some(s=>hlth(s)==='Critical') ? 'Critical'
+              : zStas.some(s=>hlth(s)==='Warning')  ? 'Warning'
+              : 'Healthy';
+    const zc = zH==='Healthy'?'var(--green)':zH==='Warning'?'var(--amber)':'var(--red)';
+    const zbc= zH==='Healthy'?'rgba(0,229,160,.2)':zH==='Warning'?'rgba(245,158,11,.2)':'rgba(239,68,68,.2)';
+    return `<div class="ov-zone-chip" style="border-color:${zbc}">
+      <span class="ov-zone-name">${z}</span>
+      <span style="font-family:var(--font-mono);font-size:10px;font-weight:700;color:${zc};margin-right:8px">${zStas.length}</span>
+      <div class="ov-zone-pips">${pips}</div>
+    </div>`;
+  }).join('');
+
+  // ── Bar widths ───────────────────────────────────────────────────
+  const bw = v => tot ? Math.max(2, Math.round(v/tot*100)) : 0;
+
+  const overview = `
+  <div class="overview fu">
+
+    <!-- HERO -->
+    <div class="ov-hero">
+      <div class="ov-hero-glow" style="background:${sysGlow}"></div>
+      <div>
+        <div class="ov-hero-title">OQGN · F&amp;G System Status</div>
+        <div class="ov-status-badge" style="color:${sysColor};border-color:${sysBorder};background:${sysBorder.replace('.3)','.07)')}">
+          <span class="ov-status-dot" style="background:${sysColor};box-shadow:0 0 8px ${sysColor}"></span>
+          ${sysStatus}
+        </div>
+        <div class="ov-big-num" style="color:${sysColor}">${healthPct}<span style="font-size:36px;opacity:.6">%</span></div>
+        <div class="ov-big-lbl">System Operational</div>
+      </div>
+      <div class="ov-bar-wrap">
+        <div class="ov-bar-row">
+          <span class="ov-bar-lbl" style="color:var(--green)">Healthy</span>
+          <div class="ov-bar-track"><div class="ov-bar-fill" style="width:${bw(sum.healthy)}%;background:var(--green)"></div></div>
+          <span class="ov-bar-count" style="color:var(--green)">${sum.healthy}</span>
+        </div>
+        <div class="ov-bar-row">
+          <span class="ov-bar-lbl" style="color:var(--amber)">Warning</span>
+          <div class="ov-bar-track"><div class="ov-bar-fill" style="width:${bw(sum.warning)}%;background:var(--amber)"></div></div>
+          <span class="ov-bar-count" style="color:var(--amber)">${sum.warning}</span>
+        </div>
+        <div class="ov-bar-row">
+          <span class="ov-bar-lbl" style="color:var(--red)">Critical</span>
+          <div class="ov-bar-track"><div class="ov-bar-fill" style="width:${bw(sum.critical)}%;background:var(--red)"></div></div>
+          <span class="ov-bar-count" style="color:var(--red)">${sum.critical}</span>
+        </div>
+        <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);display:flex;gap:16px;flex-wrap:wrap">
+          <span style="font-family:var(--font-mono);font-size:10px;color:var(--text3)">TOTAL <span style="color:var(--text);font-weight:700;font-size:13px">${sum.total}</span></span>
+          <span style="font-family:var(--font-mono);font-size:10px;color:var(--text3)">ZONES <span style="color:var(--text);font-weight:700;font-size:13px">${zoneNames.length}</span></span>
+          <span style="font-family:var(--font-mono);font-size:10px;color:var(--text3)">CL ITEMS <span style="color:var(--text);font-weight:700;font-size:13px">${CL_ITEMS.length}</span></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- STAT: Warning -->
+    <div class="ov-stat">
+      <div class="ov-stat-accent" style="background:var(--amber)"></div>
+      <div class="ov-stat-icon" style="background:rgba(245,158,11,.09);border-color:rgba(245,158,11,.22)">⚠️</div>
+      <div class="ov-stat-body">
+        <div class="ov-stat-val" style="color:var(--amber)">${sum.warning}</div>
+        <div class="ov-stat-lbl">Warning</div>
+        <div class="ov-stat-sub" style="color:var(--amber)">${sum.warning===0?'None active':'Needs attention'}</div>
+      </div>
+    </div>
+
+    <!-- STAT: Critical -->
+    <div class="ov-stat">
+      <div class="ov-stat-accent" style="background:var(--red)"></div>
+      <div class="ov-stat-icon" style="background:rgba(239,68,68,.09);border-color:rgba(239,68,68,.22)">🚨</div>
+      <div class="ov-stat-body">
+        <div class="ov-stat-val" style="color:var(--red)">${sum.critical}</div>
+        <div class="ov-stat-lbl">Critical</div>
+        <div class="ov-stat-sub" style="color:var(--red)">${sum.critical===0?'None active':'Immediate action'}</div>
+      </div>
+    </div>
+
+    <!-- STAT: Overdue -->
+    <div class="ov-stat">
+      <div class="ov-stat-accent" style="background:var(--red)"></div>
+      <div class="ov-stat-icon" style="background:rgba(239,68,68,.09);border-color:rgba(239,68,68,.22)">⏰</div>
+      <div class="ov-stat-body">
+        <div class="ov-stat-val" style="color:var(--red)">${sum.overdue}</div>
+        <div class="ov-stat-lbl">Overdue Tests</div>
+        <div class="ov-stat-sub" style="color:var(--red)">${sum.overdue===0?'All up to date':'Past due date'}</div>
+      </div>
+    </div>
+
+    <!-- STAT: Due soon -->
+    <div class="ov-stat">
+      <div class="ov-stat-accent" style="background:var(--amber)"></div>
+      <div class="ov-stat-icon" style="background:rgba(245,158,11,.09);border-color:rgba(245,158,11,.22)">📅</div>
+      <div class="ov-stat-body">
+        <div class="ov-stat-val" style="color:var(--amber)">${sum.soon}</div>
+        <div class="ov-stat-lbl">Due ≤ 14 Days</div>
+        <div class="ov-stat-sub" style="color:var(--amber)">${sum.soon===0?'No upcoming tests':'Schedule soon'}</div>
+      </div>
+    </div>
+
+    <!-- ZONE STRIP -->
+    <div class="ov-zones">
+      <div class="ov-zones-title">📍 Zone Health Overview — each dot = one station</div>
+      <div class="ov-zone-row">${zoneChips}</div>
+    </div>
+
+  </div>`;
 
   const cards=filtered.map((s,i)=>{
     const h=hlth(s), hc=HX[h], days=dLeft(s.nextTest);
@@ -1139,7 +1350,7 @@ function render(){
   </div>
 
   <div class="main">
-    <div class="kpi-row">${kpis}</div>
+    ${overview}
 
     <div class="controls">
       <input class="inp" style="width:185px" placeholder="🔍  Search stations…" value="${S.search}" oninput="S.search=this.value;render()">
