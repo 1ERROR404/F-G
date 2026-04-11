@@ -1,0 +1,1371 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>OQGN — F&G System Health Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+/* ════════════════════════════════════════════════════════════════════
+   TOKENS
+════════════════════════════════════════════════════════════════════ */
+[data-theme="dark"]{
+  --bg:#05070e; --s1:#090c16; --s2:#0c1020; --s3:#101526; --s4:#161e30;
+  --border:#18223a; --border2:#1e2d44; --border3:#26394f;
+  --text:#dde4f0; --text2:#7e96b8; --text3:#3d5470; --text4:#1e2e42;
+  --shadow:rgba(0,0,0,.6); --tbbg:rgba(5,7,14,.95);
+  --grid:rgba(255,255,255,.016);
+  --g1:rgba(0,229,160,.04); --g2:rgba(96,165,250,.03); --g3:rgba(239,68,68,.018);
+}
+[data-theme="light"]{
+  --bg:#eef2f7; --s1:#ffffff; --s2:#f6f9fc; --s3:#edf1f6; --s4:#e2e8f0;
+  --border:#dde4ee; --border2:#c8d3e0; --border3:#a0b0c0;
+  --text:#0d1520; --text2:#3a506a; --text3:#6b80a0; --text4:#a0b0c0;
+  --shadow:rgba(0,0,0,.09); --tbbg:rgba(255,255,255,.97);
+  --grid:rgba(0,0,0,.035);
+  --g1:rgba(0,180,120,.05); --g2:rgba(59,130,246,.04); --g3:rgba(239,68,68,.025);
+}
+:root{
+  --green:#00e5a0; --green-b:#00b87a;
+  --green-dim:rgba(0,229,160,.07); --green-mid:rgba(0,229,160,.13);
+  --amber:#f59e0b; --amber-dim:rgba(245,158,11,.07); --amber-mid:rgba(245,158,11,.14);
+  --red:#ef4444;   --red-dim:rgba(239,68,68,.07);   --red-mid:rgba(239,68,68,.14);
+  --blue:#60a5fa;  --blue-dim:rgba(96,165,250,.07);  --blue-mid:rgba(96,165,250,.13);
+  --fh:'Rajdhani',sans-serif; --fb:'Inter',sans-serif; --fm:'JetBrains Mono',monospace;
+  --r:8px; --rm:12px; --rl:16px; --rxl:20px;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   RESET
+════════════════════════════════════════════════════════════════════ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg); color:var(--text); font-family:var(--fb);
+  font-size:14px; line-height:1.5; min-height:100vh; overflow-x:hidden;
+  -webkit-font-smoothing:antialiased; transition:background .35s,color .35s;
+}
+body::before{
+  content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
+  background:
+    radial-gradient(ellipse 60% 35% at 10% 0%,  var(--g1) 0%,transparent 65%),
+    radial-gradient(ellipse 40% 28% at 90% 100%,var(--g2) 0%,transparent 60%),
+    radial-gradient(ellipse 28% 22% at 65% 35%, var(--g3) 0%,transparent 55%);
+  transition:background .35s;
+}
+body::after{
+  content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),
+                   linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:52px 52px;
+}
+#app{position:relative;z-index:1;display:flex;flex-direction:column;min-height:100vh}
+
+/* ════════════════════════════════════════════════════════════════════
+   TOPBAR
+════════════════════════════════════════════════════════════════════ */
+.topbar{
+  position:sticky; top:0; z-index:300;
+  display:flex; align-items:center; justify-content:space-between;
+  flex-wrap:wrap; gap:10px; padding:0 28px; height:64px;
+  background:var(--tbbg); border-bottom:1px solid var(--border);
+  backdrop-filter:blur(28px); -webkit-backdrop-filter:blur(28px);
+  transition:background .35s,border-color .35s;
+}
+.brand{display:flex;align-items:center;gap:13px}
+.brand-logo{
+  width:40px; height:40px; border-radius:11px; flex-shrink:0;
+  background:linear-gradient(140deg,var(--green),var(--green-b));
+  display:flex; align-items:center; justify-content:center; font-size:20px;
+  box-shadow:0 0 0 1px rgba(0,229,160,.4),0 4px 22px rgba(0,229,160,.22);
+}
+.brand-text{}
+.brand-title{
+  font-family:var(--fh); font-size:19px; font-weight:700;
+  letter-spacing:.07em; color:var(--text); line-height:1; transition:color .35s;
+}
+.brand-sub{
+  font-family:var(--fm); font-size:9px; color:var(--green);
+  letter-spacing:.2em; text-transform:uppercase; margin-top:2px;
+}
+.topbar-right{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+
+/* ════════════════════════════════════════════════════════════════════
+   BUTTONS
+════════════════════════════════════════════════════════════════════ */
+.btn{
+  cursor:pointer; border:none; font-family:var(--fb); font-weight:600;
+  display:inline-flex; align-items:center; gap:6px; white-space:nowrap;
+  letter-spacing:.01em; transition:all .17s cubic-bezier(.4,0,.2,1);
+  position:relative; overflow:hidden;
+}
+.btn::after{content:'';position:absolute;inset:0;background:linear-gradient(rgba(255,255,255,.08),transparent);opacity:0;transition:opacity .17s}
+.btn:hover::after{opacity:1}
+.btn:active{transform:scale(.96)}
+
+.btn-primary{
+  background:linear-gradient(135deg,var(--green),var(--green-b));
+  color:#041a0e; border-radius:var(--r); padding:8px 18px; font-size:13px;
+  box-shadow:0 0 0 1px rgba(0,229,160,.3),0 4px 16px rgba(0,229,160,.18);
+}
+.btn-primary:hover{filter:brightness(1.09);box-shadow:0 0 0 1px rgba(0,229,160,.5),0 6px 24px rgba(0,229,160,.28)}
+
+.btn-ghost{
+  background:var(--s2); color:var(--text2); border:1px solid var(--border);
+  border-radius:var(--r); padding:7px 14px; font-size:12px;
+}
+.btn-ghost:hover{border-color:var(--border2);color:var(--text)}
+
+.btn-save{
+  background:linear-gradient(135deg,#c97706,var(--amber));
+  color:#180e00; border-radius:var(--r); padding:8px 17px; font-size:13px; font-weight:700;
+  box-shadow:0 0 0 1px rgba(245,158,11,.35),0 4px 16px rgba(245,158,11,.18);
+}
+.btn-save:hover{filter:brightness(1.09);box-shadow:0 0 0 1px rgba(245,158,11,.55),0 6px 24px rgba(245,158,11,.28)}
+
+.btn-load{
+  background:linear-gradient(135deg,#1d4ed8,var(--blue));
+  color:#00040f; border-radius:var(--r); padding:8px 17px; font-size:13px; font-weight:700;
+  box-shadow:0 0 0 1px rgba(96,165,250,.35),0 4px 16px rgba(96,165,250,.18);
+}
+.btn-load:hover{filter:brightness(1.09);box-shadow:0 0 0 1px rgba(96,165,250,.55),0 6px 24px rgba(96,165,250,.28)}
+
+.btn-icon{
+  background:var(--s2); color:var(--text2); border:1px solid var(--border2);
+  border-radius:var(--r); padding:7px 12px; font-size:13px;
+}
+.btn-icon:hover{border-color:var(--border3);color:var(--text)}
+
+.btn-theme{
+  cursor:pointer; background:var(--s2); border:1px solid var(--border2);
+  border-radius:var(--r); padding:7px 13px; font-size:12px; font-weight:600;
+  font-family:var(--fb); color:var(--text2);
+  display:inline-flex; align-items:center; gap:6px;
+  transition:all .2s; white-space:nowrap;
+}
+.btn-theme:hover{border-color:var(--green);color:var(--green);background:var(--green-dim)}
+[data-theme="dark"]  .lbl-light{display:inline}[data-theme="dark"]  .lbl-dark{display:none}
+[data-theme="light"] .lbl-light{display:none} [data-theme="light"] .lbl-dark{display:inline}
+
+.mbtn{
+  cursor:pointer; border:1px solid; border-radius:7px;
+  padding:4px 11px; font-size:11px; font-weight:600;
+  font-family:var(--fm); letter-spacing:.04em;
+  display:inline-flex; align-items:center; gap:5px;
+  transition:all .14s; background:transparent;
+}
+.mbtn-cl {color:var(--blue); border-color:rgba(96,165,250,.25)}
+.mbtn-cl:hover{background:var(--blue-mid);border-color:rgba(96,165,250,.5)}
+.mbtn-ed {color:var(--green);border-color:rgba(0,229,160,.25)}
+.mbtn-ed:hover{background:var(--green-mid);border-color:rgba(0,229,160,.5)}
+.mbtn-del{color:var(--red);  border-color:rgba(239,68,68,.25)}
+.mbtn-del:hover{background:var(--red-mid);border-color:rgba(239,68,68,.5)}
+.mbtn-dl {color:var(--blue); border-color:rgba(96,165,250,.25)}
+.mbtn-dl:hover{background:var(--blue-mid)}
+
+.rbtn{
+  cursor:pointer; border:1px solid; border-radius:6px;
+  padding:3px 10px; font-size:10px; font-weight:700;
+  font-family:var(--fm); transition:all .12s; background:transparent;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   INPUTS
+════════════════════════════════════════════════════════════════════ */
+.inp{
+  background:var(--s2); color:var(--text); border:1px solid var(--border2);
+  border-radius:var(--r); padding:8px 12px; font-size:13px; font-family:var(--fb);
+  width:100%; outline:none; transition:border .17s,box-shadow .17s,background .35s,color .35s;
+}
+.inp:focus{border-color:rgba(0,229,160,.45);box-shadow:0 0 0 3px rgba(0,229,160,.08)}
+.sel{
+  background:var(--s2); color:var(--text); border:1px solid var(--border2);
+  border-radius:var(--r); padding:8px 10px; font-size:13px; font-family:var(--fb);
+  cursor:pointer; outline:none; transition:background .35s,color .35s;
+}
+.sel:focus{border-color:rgba(0,229,160,.4)}
+input[type=date]::-webkit-calendar-picker-indicator{filter:invert(.5) sepia(1) hue-rotate(90deg) brightness(1.2)}
+
+/* ════════════════════════════════════════════════════════════════════
+   INFO BAR
+════════════════════════════════════════════════════════════════════ */
+.infobar{
+  display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;
+  padding:8px 28px; background:var(--s1); border-bottom:1px solid var(--border);
+  font-size:11px; font-family:var(--fm); color:var(--text3);
+  transition:background .35s,border-color .35s;
+}
+.infobar-dot{width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:6px;flex-shrink:0}
+.infobar-hint strong{color:var(--amber);font-weight:600}
+
+/* ════════════════════════════════════════════════════════════════════
+   MAIN
+════════════════════════════════════════════════════════════════════ */
+.main{padding:24px 28px 80px}
+
+/* ════════════════════════════════════════════════════════════════════
+   OVERVIEW — full-width management panel
+════════════════════════════════════════════════════════════════════ */
+.ov-wrap{margin-bottom:28px}
+
+/* ── Row 1: hero + 4 stat tiles ── */
+.ov-row1{
+  display:grid;
+  grid-template-columns:340px repeat(4,1fr);
+  gap:12px; margin-bottom:12px;
+}
+@media(max-width:1200px){.ov-row1{grid-template-columns:300px repeat(2,1fr);grid-template-rows:auto auto}}
+@media(max-width:820px) {.ov-row1{grid-template-columns:1fr 1fr}}
+@media(max-width:520px) {.ov-row1{grid-template-columns:1fr}}
+
+/* Hero */
+.ov-hero{
+  grid-row:1/3;
+  background:var(--s1); border:1px solid var(--border); border-radius:var(--rxl);
+  padding:24px 26px; position:relative; overflow:hidden;
+  display:flex; flex-direction:column; justify-content:space-between;
+  transition:background .35s,border-color .35s;
+}
+@media(max-width:820px){.ov-hero{grid-row:auto}}
+.ov-hero-glow{position:absolute;inset:0;pointer-events:none;opacity:.08;border-radius:var(--rxl)}
+.ov-hero-eyebrow{
+  font-family:var(--fm); font-size:10px; letter-spacing:.18em;
+  text-transform:uppercase; color:var(--text3); margin-bottom:8px;
+}
+.ov-status-pill{
+  display:inline-flex; align-items:center; gap:7px;
+  padding:5px 13px; border-radius:30px; border:1px solid;
+  font-family:var(--fm); font-size:11px; font-weight:700; letter-spacing:.07em;
+  margin-bottom:16px; width:fit-content;
+}
+.ov-pulse{
+  width:7px; height:7px; border-radius:50%; flex-shrink:0;
+  animation:pulse-ring 2.4s ease-in-out infinite;
+}
+@keyframes pulse-ring{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.65)}}
+.ov-pct{
+  font-family:var(--fh); font-size:82px; font-weight:700;
+  line-height:.95; letter-spacing:-.02em;
+}
+.ov-pct sup{font-size:36px;opacity:.55;vertical-align:top;margin-top:12px;display:inline-block}
+.ov-pct-lbl{
+  font-family:var(--fm); font-size:10px; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--text3); margin-top:6px;
+}
+.ov-bars{margin-top:20px}
+.ov-bar-row{display:flex;align-items:center;gap:9px;margin-bottom:8px}
+.ov-bar-lbl{font-family:var(--fm);font-size:10px;width:58px;flex-shrink:0}
+.ov-bar-bg{flex:1;height:5px;background:var(--border);border-radius:10px;overflow:hidden}
+.ov-bar-fg{height:100%;border-radius:10px;transition:width .7s cubic-bezier(.4,0,.2,1)}
+.ov-bar-n{font-family:var(--fm);font-size:11px;font-weight:700;width:20px;text-align:right;flex-shrink:0}
+.ov-footer{
+  margin-top:16px; padding-top:14px; border-top:1px solid var(--border);
+  display:flex; gap:20px; flex-wrap:wrap;
+}
+.ov-footer-item{font-family:var(--fm);font-size:10px;color:var(--text3)}
+.ov-footer-item strong{color:var(--text);font-size:14px;font-family:var(--fh);font-weight:700;display:block;margin-top:1px}
+
+/* Stat tiles */
+.ov-tile{
+  background:var(--s1); border:1px solid var(--border); border-radius:var(--rl);
+  padding:18px 20px; position:relative; overflow:hidden;
+  display:flex; flex-direction:column; justify-content:space-between;
+  transition:transform .2s,border-color .2s,background .35s;
+  min-height:96px;
+}
+.ov-tile:hover{transform:translateY(-2px);border-color:var(--border2)}
+.ov-tile-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px}
+.ov-tile-icon{
+  width:38px;height:38px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;font-size:18px;
+  border:1px solid; flex-shrink:0;
+}
+.ov-tile-trend{
+  font-family:var(--fm);font-size:10px;font-weight:600;
+  padding:2px 8px;border-radius:20px;border:1px solid;
+}
+.ov-tile-val{font-family:var(--fh);font-size:42px;font-weight:700;line-height:1;letter-spacing:-.01em}
+.ov-tile-lbl{font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.14em;color:var(--text3);margin-top:3px}
+.ov-tile-sub{font-size:11px;font-weight:600;margin-top:3px}
+.ov-tile-bar{position:absolute;left:0;bottom:0;right:0;height:2px}
+
+/* ── Row 2: station health breakdown + last inspections + upcoming tests ── */
+.ov-row2{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+@media(max-width:1000px){.ov-row2{grid-template-columns:1fr 1fr}}
+@media(max-width:640px) {.ov-row2{grid-template-columns:1fr}}
+
+.ov-panel{
+  background:var(--s1); border:1px solid var(--border); border-radius:var(--rl);
+  padding:18px 20px; transition:background .35s,border-color .35s;
+}
+.ov-panel-hdr{
+  display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;
+}
+.ov-panel-title{
+  font-family:var(--fm); font-size:10px; font-weight:600;
+  text-transform:uppercase; letter-spacing:.16em; color:var(--text3);
+  display:flex; align-items:center; gap:7px;
+}
+.ov-panel-badge{
+  font-family:var(--fm); font-size:10px; font-weight:700;
+  padding:2px 8px; border-radius:20px; border:1px solid;
+}
+
+/* Station rows inside panels */
+.ov-stn-row{
+  display:flex; align-items:center; gap:10px; padding:7px 0;
+  border-bottom:1px solid var(--border); cursor:pointer;
+  transition:background .15s; border-radius:var(--r);
+}
+.ov-stn-row:last-child{border-bottom:none}
+.ov-stn-row:hover{background:var(--s2);padding-left:6px;padding-right:6px;margin:0 -6px}
+.ov-stn-pip{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.ov-stn-name{font-size:12px;font-weight:600;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ov-stn-meta{font-family:var(--fm);font-size:10px;color:var(--text3);flex-shrink:0}
+.ov-stn-badge{
+  font-family:var(--fm);font-size:9px;font-weight:700;
+  padding:2px 7px;border-radius:20px;border:1px solid;flex-shrink:0;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   CONTROLS
+════════════════════════════════════════════════════════════════════ */
+.controls{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;align-items:center}
+.tab-wrap{display:flex;border:1px solid var(--border2);border-radius:var(--r);overflow:hidden}
+.tab-btn{
+  padding:7px 16px;font-size:12px;font-weight:600;
+  font-family:var(--fb);cursor:pointer;border:none;transition:all .14s;letter-spacing:.02em;
+}
+.sect-divider{
+  display:flex;align-items:center;gap:12px;margin-bottom:16px;
+}
+.sect-divider-title{
+  font-family:var(--fm);font-size:10px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.16em;color:var(--text3);white-space:nowrap;
+}
+.sect-divider-line{flex:1;height:1px;background:var(--border)}
+
+/* ════════════════════════════════════════════════════════════════════
+   STATION GRID
+════════════════════════════════════════════════════════════════════ */
+.st-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(305px,1fr));gap:13px}
+
+.st-card{
+  background:var(--s1); border:1px solid var(--border); border-radius:var(--rl);
+  padding:16px; position:relative; overflow:hidden;
+  transition:transform .22s cubic-bezier(.4,0,.2,1),box-shadow .22s,border-color .22s,background .35s;
+}
+.st-card:hover{transform:translateY(-3px);box-shadow:0 18px 50px var(--shadow)}
+.st-accent{position:absolute;top:0;left:0;right:0;height:2px;border-radius:var(--rl) var(--rl) 0 0}
+.st-shimmer{position:absolute;top:0;left:0;right:0;height:60px;opacity:.05;pointer-events:none;border-radius:var(--rl) var(--rl) 0 0}
+
+.st-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+.st-name{font-family:var(--fh);font-size:14px;font-weight:700;color:var(--text);line-height:1.2;margin-bottom:2px}
+.st-id{font-family:var(--fm);font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase}
+.h-chip{
+  display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;
+  letter-spacing:.08em;padding:4px 10px;border-radius:20px;flex-shrink:0;
+  font-family:var(--fm);border:1px solid;
+}
+.h-pip{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+
+.trio{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px}
+.trio-cell{background:var(--s2);border:1px solid var(--border);border-radius:var(--r);padding:7px 4px;text-align:center;transition:background .35s}
+.trio-lbl{font-size:8px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;font-family:var(--fm);margin-bottom:4px}
+.badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:.06em;font-family:var(--fm);border:1px solid}
+
+.date-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:9px}
+.date-cell{font-size:11px;color:var(--text3)}
+.date-cell span{color:var(--text);font-weight:500;display:block;margin-top:1px;font-family:var(--fm);font-size:11px}
+
+.note-pill{
+  font-size:11px;color:var(--amber);background:var(--amber-dim);
+  border:1px solid rgba(245,158,11,.18);border-radius:var(--r);
+  padding:6px 10px;margin-bottom:9px;line-height:1.5;
+}
+
+.cl-box{background:var(--s2);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;margin-bottom:10px;transition:background .35s}
+.cl-box-row{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.cl-date{font-size:12px;color:var(--text);font-weight:600;font-family:var(--fm)}
+.cl-tech{font-size:10px;color:var(--text3);margin-top:2px}
+.cl-chips{display:flex;gap:4px;align-items:center;flex-wrap:wrap;flex-shrink:0}
+.cl-chip{font-size:10px;font-weight:700;border-radius:6px;padding:2px 8px;font-family:var(--fm);border:1px solid}
+.issue-pills{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.issue-pill{
+  font-size:9px;color:#ffaaaa;font-family:var(--fm);
+  background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.18);
+  border-radius:4px;padding:2px 7px;
+  max-width:155px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.card-actions{display:flex;gap:6px}
+
+/* ════════════════════════════════════════════════════════════════════
+   TABLE
+════════════════════════════════════════════════════════════════════ */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--rl);background:var(--s1);transition:background .35s}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead tr{background:var(--s2);border-bottom:1px solid var(--border2)}
+th{padding:11px 12px;text-align:left;color:var(--text3);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.12em;white-space:nowrap;font-family:var(--fm)}
+td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:rgba(128,128,128,.04)}
+
+/* ════════════════════════════════════════════════════════════════════
+   ADD / EDIT CARD
+════════════════════════════════════════════════════════════════════ */
+.add-card{
+  background:var(--s1);border:1px solid rgba(0,229,160,.22);
+  border-radius:var(--rl);padding:22px;margin-bottom:18px;
+  box-shadow:0 0 32px rgba(0,229,160,.04);
+}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.form-full{grid-column:1/-1}
+.form-lbl{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px;font-weight:600;font-family:var(--fm)}
+
+/* ════════════════════════════════════════════════════════════════════
+   MODAL
+════════════════════════════════════════════════════════════════════ */
+.overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.82);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  z-index:500;display:flex;align-items:center;justify-content:center;padding:16px;
+}
+.modal{
+  background:var(--s1);border:1px solid var(--border2);border-radius:var(--rxl);
+  width:100%;max-width:740px;max-height:93vh;
+  display:flex;flex-direction:column;overflow:hidden;
+  box-shadow:0 36px 100px var(--shadow);
+}
+.modal-hdr{
+  padding:17px 22px;border-bottom:1px solid var(--border);background:var(--s2);
+  display:flex;align-items:center;justify-content:space-between;flex-shrink:0;
+}
+.modal-title{font-family:var(--fh);font-size:18px;font-weight:700;color:var(--text)}
+.modal-sub{font-size:11px;color:var(--green);margin-top:2px;font-family:var(--fm)}
+.modal-body{overflow-y:auto;flex:1;padding:22px;background:var(--s1)}
+
+.hist-row{
+  background:var(--s2);border:1px solid var(--border);border-radius:var(--rm);
+  padding:13px 16px;margin-bottom:9px;cursor:pointer;
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  transition:border-color .18s,background .18s;
+}
+.hist-row:hover{border-color:rgba(0,229,160,.25);background:var(--s3)}
+.hist-row.bad{border-color:rgba(239,68,68,.22)}
+.hist-row.bad:hover{border-color:rgba(239,68,68,.45)}
+
+.cl-cat-hdr{
+  font-family:var(--fm);font-size:10px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.14em;
+  color:var(--green);background:var(--green-dim);
+  border:1px solid rgba(0,229,160,.18);
+  border-radius:var(--r);padding:6px 12px;
+  margin:14px 0 8px;display:flex;align-items:center;gap:7px;
+}
+.cl-item{
+  background:var(--s2);border:1px solid var(--border);border-radius:var(--r);
+  padding:11px 14px;margin-bottom:7px;transition:border-color .15s,background .35s;
+}
+.cl-item.is-fail{border-color:rgba(239,68,68,.38);background:rgba(239,68,68,.03)}
+.cl-item-row{display:flex;align-items:center;gap:10px}
+.cl-item-lbl{font-size:12px;color:var(--text);flex:1;line-height:1.4}
+
+.doc-row{
+  display:flex;align-items:center;gap:12px;
+  background:var(--s2);border:1px solid var(--border);border-radius:var(--r);
+  padding:10px 14px;margin-bottom:8px;transition:background .35s;
+}
+.doc-info{flex:1;min-width:0}
+.doc-name{font-size:12px;color:var(--text);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.doc-meta{font-size:10px;color:var(--text3);margin-top:2px;font-family:var(--fm)}
+
+.sect-lbl{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.14em;font-weight:600;margin-bottom:10px;font-family:var(--fm)}
+
+/* ════════════════════════════════════════════════════════════════════
+   LEGEND / EMPTY / TOAST
+════════════════════════════════════════════════════════════════════ */
+.legend{
+  display:flex;gap:16px;flex-wrap:wrap;font-size:10px;color:var(--text3);
+  align-items:center;margin-top:28px;padding-top:18px;
+  border-top:1px solid var(--border);font-family:var(--fm);
+}
+.empty{text-align:center;padding:60px 20px;color:var(--text3)}
+.empty-ico{font-size:46px;margin-bottom:14px;display:block;opacity:.38}
+#toast{
+  position:fixed;bottom:24px;right:24px;padding:11px 20px;border-radius:var(--rm);
+  font-weight:600;font-size:13px;z-index:9999;display:none;
+  box-shadow:0 10px 32px rgba(0,0,0,.6);backdrop-filter:blur(10px);font-family:var(--fb);
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   ANIMATIONS
+════════════════════════════════════════════════════════════════════ */
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes blink  {0%,100%{opacity:1}50%{opacity:.2}}
+@keyframes spin   {to{transform:rotate(360deg)}}
+.fu{animation:fadeUp .28s ease both}
+.spin{display:inline-block;animation:spin .7s linear infinite}
+
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--s1)}
+::-webkit-scrollbar-thumb{background:var(--s4);border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:var(--text3)}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast"></div>
+<script>
+// ════════════════════════════════════════════════════════════════════
+//  THEME
+// ════════════════════════════════════════════════════════════════════
+function toggleTheme(){
+  const h=document.documentElement;
+  const n=h.getAttribute('data-theme')==='dark'?'light':'dark';
+  h.setAttribute('data-theme',n);
+  try{localStorage.setItem('fg_theme',n)}catch(e){}
+  render();
+}
+(function(){try{const t=localStorage.getItem('fg_theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}})();
+function isDark(){return document.documentElement.getAttribute('data-theme')==='dark'}
+
+// ════════════════════════════════════════════════════════════════════
+//  OQGN CHECKLIST — 6 categories
+// ════════════════════════════════════════════════════════════════════
+const CL_CATS=[
+  {cat:"🔥 Fire Detection",items:[
+    "Visual inspection of all flame detectors",
+    "Functional test – UV/IR flame detectors",
+    "Functional test – Heat detectors",
+    "Functional test – Smoke detectors",
+    "Alarm panel response verified – fire circuits",
+  ]},
+  {cat:"💨 Gas Detection",items:[
+    "Visual inspection of all gas detectors",
+    "Functional test – Catalytic bead gas detectors",
+    "Functional test – Infrared (IR) gas detectors",
+    "Functional test – Sonic / ultrasonic gas detectors",
+    "Functional test – Open path / open bath gas detectors",
+    "Zero & span calibration check",
+    "Gas detector response time verified",
+  ]},
+  {cat:"🚨 Manual Call Points",items:[
+    "Visual inspection of all manual call points (MCPs)",
+    "Functional test – Manual call point activation",
+    "MCP reset and panel acknowledgement verified",
+    "MCP glass / break element condition checked",
+  ]},
+  {cat:"⚡ Power & Battery",items:[
+    "Battery backup test – all panels",
+    "Power supply voltage check",
+    "UPS / battery charger status verified",
+    "Cable & junction box integrity",
+  ]},
+  {cat:"🖥️ Control & Panel",items:[
+    "Control panel indicators & display OK",
+    "Alarm panel response verified – gas circuits",
+    "Emergency shutdown (ESD) linkage verified",
+    "F&G logic controller / HIPPS check",
+    "Historical alarm log reviewed",
+  ]},
+  {cat:"🔧 Mechanical & General",items:[
+    "Weatherproofing / enclosure integrity",
+    "Detector housing & sun shade condition",
+    "Logbook & labeling updated",
+    "Corrective actions from previous inspection closed",
+  ]},
+];
+const CL_ALL=CL_CATS.flatMap(c=>c.items);
+function freshCL(){return CL_CATS.flatMap(c=>c.items.map(l=>({label:l,cat:c.cat,result:'Pass',issue:''})))}
+
+// ════════════════════════════════════════════════════════════════════
+//  DEFAULTS  (no zone field)
+// ════════════════════════════════════════════════════════════════════
+const DEFAULT_STATIONS=[
+  {id:1, name:"STN-01 – Compressor Area",  det:"OK",     bat:"OK", pwr:"OK",   lastTest:"2025-03-15",nextTest:"2025-06-15",lastInsp:"2025-03-01",notes:""},
+  {id:2, name:"STN-02 – Wellhead Platform",det:"Fault",  bat:"OK", pwr:"OK",   lastTest:"2025-02-20",nextTest:"2025-05-20",lastInsp:"2025-02-20",notes:"CH4 detector #3 fault, under repair"},
+  {id:3, name:"STN-03 – Separator Train",  det:"OK",     bat:"Low",pwr:"OK",   lastTest:"2025-03-10",nextTest:"2025-06-10",lastInsp:"2025-03-05",notes:"Battery bank replacement scheduled"},
+  {id:4, name:"STN-04 – Pig Launcher",     det:"OK",     bat:"OK", pwr:"OK",   lastTest:"2025-03-20",nextTest:"2025-06-20",lastInsp:"2025-03-18",notes:""},
+  {id:5, name:"STN-05 – Flare KO Drum",    det:"Offline",bat:"OK", pwr:"Fault",lastTest:"2025-01-10",nextTest:"2025-04-10",lastInsp:"2025-01-10",notes:"Power supply under maintenance"},
+  {id:6, name:"STN-06 – Control Room",     det:"OK",     bat:"OK", pwr:"OK",   lastTest:"2025-03-25",nextTest:"2025-06-25",lastInsp:"2025-03-22",notes:""},
+  {id:7, name:"STN-07 – Gas Metering",     det:"OK",     bat:"OK", pwr:"OK",   lastTest:"2025-03-18",nextTest:"2025-06-18",lastInsp:"2025-03-15",notes:""},
+  {id:8, name:"STN-08 – Storage Tank Farm",det:"Fault",  bat:"OK", pwr:"OK",   lastTest:"2025-02-28",nextTest:"2025-05-28",lastInsp:"2025-02-25",notes:"Flame detector calibration needed"},
+  {id:9, name:"STN-09 – Pump Station",     det:"OK",     bat:"OK", pwr:"OK",   lastTest:"2025-03-22",nextTest:"2025-06-22",lastInsp:"2025-03-20",notes:""},
+  {id:10,name:"STN-10 – Loading Arm",      det:"OK",     bat:"OK", pwr:"Low",  lastTest:"2025-03-12",nextTest:"2025-06-12",lastInsp:"2025-03-10",notes:"UPS battery check pending"},
+  {id:11,name:"STN-11 – Utility Area",     det:"OK",     bat:"OK", pwr:"OK",   lastTest:"2025-03-28",nextTest:"2025-06-28",lastInsp:"2025-03-26",notes:""},
+  {id:12,name:"STN-12 – Manifold Header",  det:"OK",     bat:"Low",pwr:"OK",   lastTest:"2025-03-05",nextTest:"2025-06-05",lastInsp:"2025-03-02",notes:"Battery replacement Q2"},
+];
+
+// ════════════════════════════════════════════════════════════════════
+//  DB
+// ════════════════════════════════════════════════════════════════════
+let DB={stations:DEFAULT_STATIONS,checklists:{},documents:{}};
+(function(){try{const r=localStorage.getItem('fg_v6');if(r){DB=JSON.parse(r);if(!DB.documents)DB.documents={};if(!DB.checklists)DB.checklists={};}}catch(e){}})();
+function persist(){try{localStorage.setItem('fg_v6',JSON.stringify(DB))}catch(e){toast('Storage full – use Save & Share','warn')}}
+
+// ════════════════════════════════════════════════════════════════════
+//  HEALTH
+// ════════════════════════════════════════════════════════════════════
+const T0=new Date().setHours(0,0,0,0);
+function dLeft(d){if(!d)return null;return Math.ceil((new Date(d)-T0)/86400000)}
+function hlth(s){
+  if(s.det==="Offline"||s.pwr==="Fault")return"Critical";
+  if(s.det==="Fault"||s.bat==="Low"||s.pwr==="Low")return"Warning";
+  const d=dLeft(s.nextTest);if(d!==null&&d<14)return"Warning";
+  return"Healthy";
+}
+const HX={Healthy:"#00e5a0",Warning:"#f59e0b",Critical:"#ef4444"};
+const HC={Healthy:"var(--green)",Warning:"var(--amber)",Critical:"var(--red)"};
+const SC={
+  OK:     {c:"var(--green)",x:"#00e5a0",bg:"rgba(0,229,160,.1)"},
+  Fault:  {c:"var(--red)",  x:"#ef4444",bg:"rgba(239,68,68,.1)"},
+  Offline:{c:"var(--text3)",x:"#3d5470",bg:"rgba(61,84,112,.1)"},
+  Low:    {c:"var(--amber)",x:"#f59e0b",bg:"rgba(245,158,11,.1)"},
+};
+
+// ════════════════════════════════════════════════════════════════════
+//  HELPERS
+// ════════════════════════════════════════════════════════════════════
+function badge(v){const c=SC[v]||SC.OK;return`<span class="badge" style="color:${c.c};background:${c.bg};border-color:${c.x}33">${v.toUpperCase()}</span>`}
+function pip(h,sz=7){return`<span style="display:inline-block;width:${sz}px;height:${sz}px;border-radius:50%;background:${HX[h]};box-shadow:0 0 6px ${HX[h]}88;flex-shrink:0"></span>`}
+function dtag(d){
+  if(d===null)return`<span style="color:var(--text3)">—</span>`;
+  if(d<0) return`<span style="color:var(--red);font-weight:700;font-family:var(--fm)">${Math.abs(d)}d OVR</span>`;
+  if(d<14)return`<span style="color:var(--amber);font-weight:600;font-family:var(--fm)">${d}d</span>`;
+  return`<span style="color:var(--text3);font-family:var(--fm)">${d}d</span>`;
+}
+function fDate(d){if(!d)return'—';try{return new Date(d).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}catch(e){return d}}
+function fSize(b){if(b<1024)return b+'B';if(b<1048576)return(b/1024).toFixed(1)+'KB';return(b/1048576).toFixed(1)+'MB'}
+function docIco(n){return{pdf:'📄',doc:'📝',docx:'📝',xls:'📊',xlsx:'📊',png:'🖼️',jpg:'🖼️',jpeg:'🖼️',txt:'📋'}[(n.split('.').pop()||'').toLowerCase()]||'📎'}
+
+// ════════════════════════════════════════════════════════════════════
+//  TOAST
+// ════════════════════════════════════════════════════════════════════
+function toast(msg,type='ok'){
+  const t=document.getElementById('toast');
+  const m={ok:['#00e5a0','#041a0e'],err:['#ef4444','#fff'],warn:['#f59e0b','#1a0c00']};
+  const[bg,fg]=m[type]||m.ok;
+  t.textContent=msg;t.style.background=bg;t.style.color=fg;
+  t.style.display='block';clearTimeout(t._t);t._t=setTimeout(()=>t.style.display='none',3000);
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  FILE OPS
+// ════════════════════════════════════════════════════════════════════
+async function saveShare(){
+  const blob=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'});
+  if(window.showSaveFilePicker){
+    try{
+      const h=await window.showSaveFilePicker({suggestedName:'fg_data.json',types:[{description:'JSON',accept:{'application/json':['.json']}}]});
+      const w=await h.createWritable();await w.write(blob);await w.close();
+      toast('✓ Saved to: '+h.name);return;
+    }catch(e){if(e.name==='AbortError')return}
+  }
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='fg_data.json';a.click();
+  toast('✓ Downloaded fg_data.json');
+}
+function loadLatest(){
+  const inp=document.createElement('input');inp.type='file';inp.accept='.json';
+  inp.onchange=e=>{
+    const file=e.target.files[0];if(!file)return;
+    const r=new FileReader();
+    r.onload=ev=>{
+      try{
+        const p=JSON.parse(ev.target.result);if(!p.stations)throw 0;
+        DB=p;if(!DB.documents)DB.documents={};if(!DB.checklists)DB.checklists={};
+        persist();render();toast('✓ Loaded: '+file.name);
+      }catch(e){toast('Invalid file','err')}
+    };r.readAsText(file);
+  };inp.click();
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  EXCEL
+// ════════════════════════════════════════════════════════════════════
+function exportXL(){
+  const wb=XLSX.utils.book_new(),now=new Date().toLocaleDateString('en-GB');
+  const rows=[
+    ['OQGN — F&G SYSTEM HEALTH DASHBOARD'],['Generated:',now],[],['OVERVIEW'],
+    ['Total',DB.stations.length],
+    ['Healthy',DB.stations.filter(s=>hlth(s)==='Healthy').length],
+    ['Warning',DB.stations.filter(s=>hlth(s)==='Warning').length],
+    ['Critical',DB.stations.filter(s=>hlth(s)==='Critical').length],
+    ['Overdue',DB.stations.filter(s=>{const d=dLeft(s.nextTest);return d!==null&&d<0}).length],
+    ['Due ≤14d',DB.stations.filter(s=>{const d=dLeft(s.nextTest);return d!==null&&d>=0&&d<=14}).length],
+    [],['STATION DETAILS'],
+    ['Station','Health','Detector','Battery','Power','Last Test','Next Test','Days','Last Inspection','Notes','Last CL','Technician','Fails','Inspections','Docs'],
+  ];
+  DB.stations.forEach(s=>{
+    const h=hlth(s),d=dLeft(s.nextTest),cl=DB.checklists[s.id]||[],last=cl.length?cl[cl.length-1]:null;
+    rows.push([s.name,h,s.det,s.bat,s.pwr,s.lastTest||'',s.nextTest||'',
+      d!==null?(d<0?`${Math.abs(d)}d OVR`:`${d}d`):'-',
+      s.lastInsp||'',s.notes||'',last?last.date:'-',last?last.techName:'-',
+      last?last.failCount:'-',cl.length,(DB.documents[s.id]||[]).length]);
+  });
+  const ws1=XLSX.utils.aoa_to_sheet(rows);
+  ws1['!cols']=[{wch:30},{wch:10},{wch:11},{wch:11},{wch:9},{wch:12},{wch:12},{wch:10},{wch:14},{wch:34},{wch:13},{wch:16},{wch:6},{wch:10},{wch:5}];
+  XLSX.utils.book_append_sheet(wb,ws1,'Summary');
+
+  const cl2=[['CHECKLIST HISTORY'],[],['Station','Date','Technician','Category','Pass','Fail','N/A','Note','Failed Items']];
+  DB.stations.forEach(s=>(DB.checklists[s.id]||[]).forEach(c=>{
+    cl2.push([s.name,c.date,c.techName,'All',c.passCount,c.failCount,c.naCount,c.overallNote||'',
+      c.items.filter(x=>x.result==='Fail').map(x=>x.label+(x.issue?` → ${x.issue}`:'')).join(' | ')]);
+  }));
+  const ws2=XLSX.utils.aoa_to_sheet(cl2);ws2['!cols']=[{wch:28},{wch:12},{wch:18},{wch:20},{wch:6},{wch:6},{wch:6},{wch:32},{wch:80}];
+  XLSX.utils.book_append_sheet(wb,ws2,'Checklist History');
+
+  const iss=[['OPEN ISSUES'],[],['Station','Date','Technician','Category','Item','Issue Detail']];
+  DB.stations.forEach(s=>(DB.checklists[s.id]||[]).forEach(c=>c.items.filter(x=>x.result==='Fail').forEach(x=>iss.push([s.name,c.date,c.techName,x.cat||'',x.label,x.issue||'']))));
+  const ws3=XLSX.utils.aoa_to_sheet(iss);ws3['!cols']=[{wch:28},{wch:12},{wch:18},{wch:22},{wch:35},{wch:50}];
+  XLSX.utils.book_append_sheet(wb,ws3,'Open Issues');
+
+  XLSX.writeFile(wb,`OQGN_FG_${new Date().toISOString().slice(0,10)}.xlsx`);
+  toast('✓ Excel report downloaded');
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  DOCUMENTS
+// ════════════════════════════════════════════════════════════════════
+function uploadDoc(sid){
+  const inp=document.createElement('input');inp.type='file';
+  inp.accept='.pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.txt';
+  inp.onchange=e=>{
+    const file=e.target.files[0];if(!file)return;
+    if(file.size>5*1024*1024){toast('Max 5 MB per file','warn');return}
+    const r=new FileReader();
+    r.onload=ev=>{
+      const doc={id:Date.now(),name:file.name,size:fSize(file.size),type:file.type,
+                 data:ev.target.result,by:S.updater||'Team',at:new Date().toLocaleDateString('en-GB')};
+      if(!DB.documents[sid])DB.documents[sid]=[];
+      DB.documents[sid].push(doc);
+      persist();renderModal();toast('✓ Uploaded: '+file.name);
+    };r.readAsDataURL(file);
+  };inp.click();
+}
+function deleteDoc(sid,did){
+  if(!confirm('Delete this document?'))return;
+  DB.documents[sid]=(DB.documents[sid]||[]).filter(d=>d.id!==did);
+  persist();renderModal();toast('Document deleted');
+}
+function downloadDoc(sid,did){
+  const doc=(DB.documents[sid]||[]).find(d=>d.id===did);if(!doc)return;
+  const ext=(doc.name.split('.').pop()||'').toLowerCase();
+  const prev=['pdf','png','jpg','jpeg','gif','bmp','webp','svg'];
+  if(prev.includes(ext)){
+    const bs=atob(doc.data.split(',')[1]);
+    const mime=doc.data.split(',')[0].split(':')[1].split(';')[0];
+    const ab=new Uint8Array(bs.length);for(let i=0;i<bs.length;i++)ab[i]=bs.charCodeAt(i);
+    const url=URL.createObjectURL(new Blob([ab],{type:mime}));
+    const w=window.open(url,'_blank');
+    if(w)w.addEventListener('load',()=>URL.revokeObjectURL(url),{once:true});
+    else{const a=document.createElement('a');a.href=url;a.download=doc.name;a.click();setTimeout(()=>URL.revokeObjectURL(url),5000)}
+  }else{
+    const a=document.createElement('a');a.href=doc.data;a.download=doc.name;
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  CHECKLIST
+// ════════════════════════════════════════════════════════════════════
+function submitCL(sid){
+  if(!S.clTech.trim()){alert('Enter technician name.');return}
+  const entry={
+    id:Date.now(),date:S.clDate,techName:S.clTech.trim(),
+    items:S.clItems.map(x=>({...x})),overallNote:S.clNote,
+    passCount:S.clItems.filter(x=>x.result==='Pass').length,
+    failCount:S.clItems.filter(x=>x.result==='Fail').length,
+    naCount:  S.clItems.filter(x=>x.result==='NA').length,
+  };
+  if(!DB.checklists[sid])DB.checklists[sid]=[];
+  DB.checklists[sid].push(entry);
+  const st=DB.stations.find(s=>s.id===sid);
+  if(st){st.lastInsp=entry.date;st.lastTest=entry.date}
+  persist();
+  S.clView='history';S.clTech='';S.clNote='';S.clItems=freshCL();
+  renderModal();render();toast('✓ Inspection logged');
+}
+function setClR(i,r){S.clItems[i].result=r;S.clItems[i].issue='';renderModal()}
+function setClI(i,v){S.clItems[i].issue=v}
+
+// ════════════════════════════════════════════════════════════════════
+//  STATION CRUD
+// ════════════════════════════════════════════════════════════════════
+function saveStation(){
+  const n=S.updater.trim()||'Team';
+  if(S.editId){
+    DB.stations=DB.stations.map(s=>s.id===S.editId?{...s,...S.editData,updatedBy:n}:s);
+    S.editId=null;S.editData={};
+  }else{
+    if(!S.newStn.name.trim()){alert('Enter station name.');return}
+    DB.stations.push({...S.newStn,id:Date.now(),updatedBy:n});
+    S.addMode=false;
+    S.newStn={name:'',det:'OK',bat:'OK',pwr:'OK',lastTest:'',nextTest:'',lastInsp:'',notes:''};
+  }
+  persist();render();toast('✓ Station saved');
+}
+function startEdit(id){const s=DB.stations.find(s=>s.id===id);S.editId=id;S.editData={...s};render()}
+function cancelEdit(){S.editId=null;S.editData={};render()}
+function delStation(id){
+  if(!confirm('Delete this station?'))return;
+  DB.stations=DB.stations.filter(s=>s.id!==id);
+  persist();render();toast('Station deleted');
+}
+function openModal(id){S.modal=DB.stations.find(s=>s.id===id);S.clView='history';S.clDetail=null;renderModal()}
+function closeModal(){S.modal=null;document.getElementById('modal-root').innerHTML=''}
+function patchF(w,k,v){if(w==='new')S.newStn[k]=v;else S.editData[k]=v}
+
+// ════════════════════════════════════════════════════════════════════
+//  APP STATE
+// ════════════════════════════════════════════════════════════════════
+let S={
+  tab:'grid',filterH:'All',search:'',
+  editId:null,editData:{},addMode:false,updater:'',
+  newStn:{name:'',det:'OK',bat:'OK',pwr:'OK',lastTest:'',nextTest:'',lastInsp:'',notes:''},
+  modal:null,clView:'history',clDetail:null,
+  clTech:'',clDate:new Date().toISOString().slice(0,10),
+  clItems:freshCL(),clNote:'',
+};
+
+// ════════════════════════════════════════════════════════════════════
+//  FORM HTML  (no zone)
+// ════════════════════════════════════════════════════════════════════
+function formHTML(data,w){
+  const v=k=>data[k]||'';
+  const opts=k=>['OK','Fault','Offline','Low'].map(o=>`<option${v(k)===o?' selected':''}>${o}</option>`).join('');
+  return`<div class="form-grid">
+    <div class="form-full"><div class="form-lbl">Station Name</div><input class="inp" value="${v('name')}" oninput="patchF('${w}','name',this.value)" placeholder="e.g. STN-13 – New Platform"></div>
+    <div><div class="form-lbl">Last Test Date</div><input type="date" class="inp" value="${v('lastTest')}" onchange="patchF('${w}','lastTest',this.value)"></div>
+    <div><div class="form-lbl">Next Test Date</div><input type="date" class="inp" value="${v('nextTest')}" onchange="patchF('${w}','nextTest',this.value)"></div>
+    <div><div class="form-lbl">Last Inspection</div><input type="date" class="inp" value="${v('lastInsp')}" onchange="patchF('${w}','lastInsp',this.value)"></div>
+    <div><div class="form-lbl">Detector Status</div><select class="inp" onchange="patchF('${w}','det',this.value)">${opts('det')}</select></div>
+    <div><div class="form-lbl">Battery Status</div><select class="inp" onchange="patchF('${w}','bat',this.value)">${opts('bat')}</select></div>
+    <div><div class="form-lbl">Power Status</div><select class="inp" onchange="patchF('${w}','pwr',this.value)">${opts('pwr')}</select></div>
+    <div class="form-full"><div class="form-lbl">Notes</div><textarea class="inp" rows="2" oninput="patchF('${w}','notes',this.value)">${v('notes')}</textarea></div>
+  </div>`;
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  MODAL
+// ════════════════════════════════════════════════════════════════════
+function renderModal(){
+  const root=document.getElementById('modal-root');
+  if(!S.modal){root.innerHTML='';return}
+  const s=DB.stations.find(x=>x.id===S.modal.id);
+  if(!s){root.innerHTML='';return}
+  const hist=(DB.checklists[s.id]||[]).slice().reverse();
+  const docs=DB.documents[s.id]||[];
+  let body='';
+
+  if(S.clView==='history'){
+    const hH=hist.length===0
+      ?`<div class="empty"><span class="empty-ico">📭</span><div style="font-size:13px">No inspections yet.</div><div style="font-size:11px;margin-top:6px;color:var(--text3)">Click <strong style="color:var(--green)">+ New Check</strong> to start.</div></div>`
+      :hist.map(e=>`<div class="hist-row ${e.failCount>0?'bad':''}" onclick="openCLDetail(${e.id})">
+        <div>
+          <div style="font-weight:700;color:var(--text);font-size:13px;font-family:var(--fm);margin-bottom:2px">${e.date}</div>
+          <div style="font-size:11px;color:var(--text3)">By <span style="color:var(--text2)">${e.techName}</span></div>
+          ${e.overallNote?`<div style="font-size:10px;color:var(--amber);margin-top:3px">📝 ${e.overallNote}</div>`:''}
+        </div>
+        <div style="display:flex;gap:5px;align-items:center;flex-shrink:0">
+          <span style="font-size:10px;font-weight:700;font-family:var(--fm);color:var(--green);background:rgba(0,229,160,.1);border:1px solid rgba(0,229,160,.22);border-radius:6px;padding:3px 9px">✓ ${e.passCount}</span>
+          ${e.failCount>0?`<span style="font-size:10px;font-weight:700;font-family:var(--fm);color:var(--red);background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.22);border-radius:6px;padding:3px 9px">✗ ${e.failCount}</span>`:''}
+          ${e.naCount>0?`<span style="font-size:10px;font-family:var(--fm);color:var(--text3);background:rgba(61,84,112,.1);border:1px solid rgba(61,84,112,.2);border-radius:6px;padding:3px 9px">— ${e.naCount}</span>`:''}
+          <span style="color:var(--text3);font-size:18px">›</span>
+        </div>
+      </div>`).join('');
+
+    const dH=`<div style="margin-top:22px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div class="sect-lbl" style="margin:0">📎 Documents (${docs.length})</div>
+        <button class="btn btn-primary" style="padding:6px 14px;font-size:12px" onclick="uploadDoc(${s.id})">+ Upload File</button>
+      </div>
+      ${docs.length===0
+        ?`<div style="font-size:12px;color:var(--text3);text-align:center;padding:20px;border:1px dashed var(--border);border-radius:var(--r)">No documents. Upload PDFs, photos, test reports (max 5 MB each).</div>`
+        :docs.map(d=>`<div class="doc-row">
+          <span style="font-size:22px">${docIco(d.name)}</span>
+          <div class="doc-info"><div class="doc-name">${d.name}</div><div class="doc-meta">${d.size} · ${d.at} · by ${d.by}</div></div>
+          <div style="display:flex;gap:6px;flex-shrink:0">
+            <button class="mbtn mbtn-dl" onclick="downloadDoc(${s.id},${d.id})">👁 Open</button>
+            <button class="mbtn mbtn-del" onclick="deleteDoc(${s.id},${d.id})">Del</button>
+          </div>
+        </div>`).join('')}
+    </div>`;
+    body=hH+dH;
+
+  }else if(S.clView==='detail'&&S.clDetail){
+    const e=S.clDetail,fails=e.items.filter(x=>x.result==='Fail');
+    const catMap={};
+    e.items.forEach(it=>{const c=it.cat||'General';if(!catMap[c])catMap[c]=[];catMap[c].push(it)});
+    body=`<button onclick="S.clView='history';S.clDetail=null;renderModal()" style="background:none;color:var(--green);border:none;font-size:12px;cursor:pointer;margin-bottom:16px;font-family:var(--fb);display:flex;align-items:center;gap:5px">← Back to History</button>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;background:var(--s2);border:1px solid var(--border);border-radius:var(--rm);padding:16px;margin-bottom:16px">
+        ${[['Date',`<span style="font-family:var(--fm)">${e.date}</span>`],['Technician',e.techName],
+          ['Result',e.failCount>0?`<span style="color:var(--red);font-weight:700">${e.failCount} Issue(s)</span>`:`<span style="color:var(--green);font-weight:700">All Clear ✓</span>`],
+          ['Pass / Fail / N/A',`<span style="font-family:var(--fm)">${e.passCount} / ${e.failCount} / ${e.naCount}</span>`]]
+          .map(([l,v])=>`<div><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.12em;font-family:var(--fm);margin-bottom:4px">${l}</div><div style="font-size:13px;font-weight:600;color:var(--text)">${v}</div></div>`).join('')}
+      </div>
+      ${fails.length>0?`<div style="background:var(--red-dim);border:1px solid rgba(239,68,68,.2);border-radius:var(--rm);padding:16px;margin-bottom:16px">
+        <div style="font-size:12px;font-weight:700;color:var(--red);font-family:var(--fh);margin-bottom:11px;letter-spacing:.04em">⚠ ISSUES FOUND (${fails.length})</div>
+        ${fails.map(x=>`<div style="margin-bottom:9px;padding-left:13px;border-left:2px solid rgba(239,68,68,.4)">
+          ${x.cat?`<div style="font-size:9px;color:var(--text3);font-family:var(--fm);margin-bottom:2px">${x.cat}</div>`:''}
+          <div style="font-size:12px;color:#ffc0c0;font-weight:600">✗ ${x.label}</div>
+          ${x.issue?`<div style="font-size:11px;color:var(--red);margin-top:3px;font-family:var(--fm)">↳ ${x.issue}</div>`:''}</div>`).join('')}</div>`:''}
+      ${Object.entries(catMap).map(([cat,items])=>`
+        <div class="cl-cat-hdr">${cat}</div>
+        ${items.map(it=>{
+          const col=it.result==='Pass'?'var(--green)':it.result==='Fail'?'var(--red)':'var(--text3)';
+          const ico=it.result==='Pass'?'✓':it.result==='Fail'?'✗':'—';
+          return`<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--border)">
+            <span style="color:${col};font-weight:700;font-size:14px;min-width:18px;text-align:center;font-family:var(--fm)">${ico}</span>
+            <div style="flex:1"><div style="font-size:12px;color:${it.result==='Fail'?'#ffc0c0':'var(--text)'}">${it.label}</div>
+            ${it.issue?`<div style="font-size:11px;color:var(--red);margin-top:2px;font-family:var(--fm)">↳ ${it.issue}</div>`:''}</div>
+            <span style="font-size:10px;color:${col};background:${col}18;border:1px solid ${col}33;border-radius:5px;padding:2px 8px;flex-shrink:0;font-family:var(--fm)">${it.result}</span>
+          </div>`;
+        }).join('')}`).join('')}
+      ${e.overallNote?`<div style="margin-top:14px;background:var(--amber-dim);border:1px solid rgba(245,158,11,.2);border-radius:var(--r);padding:12px;font-size:12px;color:var(--amber)">📝 <strong>Note:</strong> ${e.overallNote}</div>`:''}`;
+
+  }else if(S.clView==='new'){
+    let idx=0;
+    const secs=CL_CATS.map(cat=>{
+      const si=idx;
+      const sec=`<div class="cl-cat-hdr">${cat.cat} <span style="opacity:.45;font-weight:400">(${cat.items.length})</span></div>
+        ${cat.items.map((label,j)=>{
+          const i=si+j,it=S.clItems[i];
+          return`<div class="cl-item ${it&&it.result==='Fail'?'is-fail':''}">
+            <div class="cl-item-row">
+              <span class="cl-item-lbl">${label}</span>
+              <div style="display:flex;gap:5px;flex-shrink:0">
+                ${['Pass','Fail','NA'].map(r=>{
+                  const a=it&&it.result===r;
+                  const rc=r==='Pass'?'#00e5a0':r==='Fail'?'#ef4444':'#3d5470';
+                  return`<button class="rbtn" onclick="setClR(${i},'${r}')" style="background:${a?rc:'transparent'};color:${a?'#060810':rc};border-color:${rc}55">${r}</button>`;
+                }).join('')}
+              </div>
+            </div>
+            ${it&&it.result==='Fail'?`<input class="inp" style="margin-top:9px;font-size:12px" placeholder="Describe the issue…" value="${(it&&it.issue)||''}" oninput="setClI(${i},this.value)">`:''}
+          </div>`;
+        }).join('')}`;
+      idx+=cat.items.length;return sec;
+    }).join('');
+
+    body=`<button onclick="S.clView='history';renderModal()" style="background:none;color:var(--green);border:none;font-size:12px;cursor:pointer;margin-bottom:16px;font-family:var(--fb)">← Cancel</button>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px">
+        <div><div class="form-lbl">Technician Name *</div><input class="inp" value="${S.clTech}" oninput="S.clTech=this.value" placeholder="Your full name"></div>
+        <div><div class="form-lbl">Inspection Date</div><input type="date" class="inp" value="${S.clDate}" onchange="S.clDate=this.value"></div>
+      </div>
+      <div style="background:var(--green-dim);border:1px solid rgba(0,229,160,.18);border-radius:var(--r);padding:10px 14px;margin-bottom:14px;font-size:11px;color:var(--green);font-family:var(--fm)">
+        OQGN F&G Inspection — ${CL_ALL.length} items · ${CL_CATS.length} categories
+      </div>
+      ${secs}
+      <div style="margin-top:14px"><div class="form-lbl">Overall Notes / Remarks</div>
+        <textarea class="inp" rows="3" placeholder="General observations, corrective actions, follow-up…" oninput="S.clNote=this.value">${S.clNote}</textarea>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button class="btn btn-primary" onclick="submitCL(${s.id})">Submit Inspection</button>
+        <button class="btn btn-ghost" onclick="S.clView='history';renderModal()">Cancel</button>
+      </div>`;
+  }
+
+  root.innerHTML=`<div class="overlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal">
+      <div class="modal-hdr">
+        <div>
+          <div class="modal-title">📋 Checklist & Documents</div>
+          <div class="modal-sub">${s.name}</div>
+        </div>
+        <div style="display:flex;gap:7px">
+          ${S.clView!=='new'?`<button class="btn btn-primary" style="font-size:12px;padding:6px 14px" onclick="S.clView='new';renderModal()">+ New Check</button>`:''}
+          <button class="btn btn-ghost" style="font-size:18px;padding:5px 12px" onclick="closeModal()">✕</button>
+        </div>
+      </div>
+      <div class="modal-body">${body}</div>
+    </div>
+  </div>`;
+}
+function openCLDetail(id){
+  S.clDetail=(DB.checklists[S.modal.id]||[]).find(e=>e.id===id);
+  S.clView='detail';renderModal();
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  MAIN RENDER
+// ════════════════════════════════════════════════════════════════════
+function render(){
+  const tot=DB.stations.length;
+  const sum={
+    total:tot,
+    healthy: DB.stations.filter(s=>hlth(s)==='Healthy').length,
+    warning: DB.stations.filter(s=>hlth(s)==='Warning').length,
+    critical:DB.stations.filter(s=>hlth(s)==='Critical').length,
+    overdue: DB.stations.filter(s=>{const d=dLeft(s.nextTest);return d!==null&&d<0}).length,
+    soon:    DB.stations.filter(s=>{const d=dLeft(s.nextTest);return d!==null&&d>=0&&d<=14}).length,
+  };
+  const pct=tot?Math.round(sum.healthy/tot*100):0;
+  const sysOK=sum.critical===0&&sum.overdue===0;
+  const sysCrit=sum.critical>0;
+  const sysStatus=sysCrit?'CRITICAL ALERT':sum.warning>0||sum.overdue>0?'ATTENTION REQUIRED':'ALL SYSTEMS OK';
+  const sysC=sysCrit?'var(--red)':sum.warning>0||sum.overdue>0?'var(--amber)':'var(--green)';
+  const sysBg=sysCrit?'rgba(239,68,68,.08)':sum.warning>0||sum.overdue>0?'rgba(245,158,11,.07)':'rgba(0,229,160,.07)';
+  const sysBd=sysCrit?'rgba(239,68,68,.28)':sum.warning>0||sum.overdue>0?'rgba(245,158,11,.28)':'rgba(0,229,160,.28)';
+  const sysGlow=sysCrit?'radial-gradient(ellipse 100% 70% at 0 0,rgba(239,68,68,.18),transparent)'
+                :sum.warning>0?'radial-gradient(ellipse 100% 70% at 0 0,rgba(245,158,11,.12),transparent)'
+                :'radial-gradient(ellipse 100% 70% at 0 0,rgba(0,229,160,.12),transparent)';
+
+  // last inspections (most recent 5 across all stations)
+  const allCL=[];
+  DB.stations.forEach(s=>(DB.checklists[s.id]||[]).forEach(c=>allCL.push({...c,stName:s.name,stId:s.id})));
+  allCL.sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const recent5=allCL.slice(0,5);
+
+  // upcoming tests (next 5 soonest)
+  const upcoming=DB.stations
+    .filter(s=>s.nextTest)
+    .map(s=>({...s,days:dLeft(s.nextTest)}))
+    .sort((a,b)=>a.days-b.days)
+    .slice(0,5);
+
+  // critical/warning stations
+  const alertStn=DB.stations.filter(s=>hlth(s)!=='Healthy').sort((a,b)=>{
+    const o={Critical:0,Warning:1};return o[hlth(a)]-o[hlth(b)];
+  }).slice(0,6);
+
+  const bw=v=>tot?Math.max(2,Math.round(v/tot*100)):0;
+
+  // ── overview HTML ──────────────────────────────────────────────
+  const ovHTML=`
+  <div class="ov-wrap fu">
+
+    <!-- ROW 1 -->
+    <div class="ov-row1">
+
+      <!-- HERO -->
+      <div class="ov-hero">
+        <div class="ov-hero-glow" style="background:${sysGlow}"></div>
+        <div>
+          <div class="ov-hero-eyebrow">OQGN · F&amp;G System Overview · ${new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}</div>
+          <div class="ov-status-pill" style="color:${sysC};border-color:${sysBd};background:${sysBg}">
+            <span class="ov-pulse" style="background:${sysC};box-shadow:0 0 8px ${sysC}"></span>
+            ${sysStatus}
+          </div>
+          <div class="ov-pct" style="color:${sysC}">${pct}<sup>%</sup></div>
+          <div class="ov-pct-lbl">Stations Operational</div>
+        </div>
+        <div class="ov-bars">
+          <div class="ov-bar-row">
+            <span class="ov-bar-lbl" style="color:var(--green)">Healthy</span>
+            <div class="ov-bar-bg"><div class="ov-bar-fg" style="width:${bw(sum.healthy)}%;background:var(--green)"></div></div>
+            <span class="ov-bar-n" style="color:var(--green)">${sum.healthy}</span>
+          </div>
+          <div class="ov-bar-row">
+            <span class="ov-bar-lbl" style="color:var(--amber)">Warning</span>
+            <div class="ov-bar-bg"><div class="ov-bar-fg" style="width:${bw(sum.warning)}%;background:var(--amber)"></div></div>
+            <span class="ov-bar-n" style="color:var(--amber)">${sum.warning}</span>
+          </div>
+          <div class="ov-bar-row">
+            <span class="ov-bar-lbl" style="color:var(--red)">Critical</span>
+            <div class="ov-bar-bg"><div class="ov-bar-fg" style="width:${bw(sum.critical)}%;background:var(--red)"></div></div>
+            <span class="ov-bar-n" style="color:var(--red)">${sum.critical}</span>
+          </div>
+          <div class="ov-footer">
+            <div class="ov-footer-item">Total Stations<strong>${sum.total}</strong></div>
+            <div class="ov-footer-item">CL Items<strong>${CL_ALL.length}</strong></div>
+            <div class="ov-footer-item">Inspections<strong>${allCL.length}</strong></div>
+            <div class="ov-footer-item">Open Issues<strong style="color:${sum.critical+sum.warning>0?'var(--red)':'var(--green)'}">${sum.critical+sum.warning}</strong></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TILE: Warning -->
+      <div class="ov-tile">
+        <div class="ov-tile-bar" style="background:var(--amber)"></div>
+        <div class="ov-tile-top">
+          <div class="ov-tile-icon" style="background:var(--amber-dim);border-color:rgba(245,158,11,.25)">⚠️</div>
+          <span class="ov-tile-trend" style="color:var(--amber);background:var(--amber-dim);border-color:rgba(245,158,11,.22)">${sum.warning===0?'Clear':'Active'}</span>
+        </div>
+        <div class="ov-tile-val" style="color:var(--amber)">${sum.warning}</div>
+        <div class="ov-tile-lbl">Warning</div>
+        <div class="ov-tile-sub" style="color:var(--amber)">${sum.warning===0?'No warnings':'Needs attention'}</div>
+      </div>
+
+      <!-- TILE: Critical -->
+      <div class="ov-tile">
+        <div class="ov-tile-bar" style="background:var(--red)"></div>
+        <div class="ov-tile-top">
+          <div class="ov-tile-icon" style="background:var(--red-dim);border-color:rgba(239,68,68,.25)">🚨</div>
+          <span class="ov-tile-trend" style="color:${sum.critical>0?'var(--red)':'var(--green)'};background:${sum.critical>0?'var(--red-dim)':'var(--green-dim)'};border-color:${sum.critical>0?'rgba(239,68,68,.22)':'rgba(0,229,160,.22)'}">${sum.critical===0?'Clear':'ALERT'}</span>
+        </div>
+        <div class="ov-tile-val" style="color:var(--red)">${sum.critical}</div>
+        <div class="ov-tile-lbl">Critical</div>
+        <div class="ov-tile-sub" style="color:${sum.critical>0?'var(--red)':'var(--text3)'}">${sum.critical===0?'No critical issues':'Immediate action'}</div>
+      </div>
+
+      <!-- TILE: Overdue -->
+      <div class="ov-tile">
+        <div class="ov-tile-bar" style="background:var(--red)"></div>
+        <div class="ov-tile-top">
+          <div class="ov-tile-icon" style="background:var(--red-dim);border-color:rgba(239,68,68,.25)">⏰</div>
+          <span class="ov-tile-trend" style="color:${sum.overdue>0?'var(--red)':'var(--green)'};background:${sum.overdue>0?'var(--red-dim)':'var(--green-dim)'};border-color:${sum.overdue>0?'rgba(239,68,68,.22)':'rgba(0,229,160,.22)'}">${sum.overdue===0?'On track':'Overdue'}</span>
+        </div>
+        <div class="ov-tile-val" style="color:var(--red)">${sum.overdue}</div>
+        <div class="ov-tile-lbl">Overdue Tests</div>
+        <div class="ov-tile-sub" style="color:${sum.overdue>0?'var(--red)':'var(--text3)'}">${sum.overdue===0?'All tests current':'Past due date'}</div>
+      </div>
+
+      <!-- TILE: Due soon -->
+      <div class="ov-tile">
+        <div class="ov-tile-bar" style="background:var(--amber)"></div>
+        <div class="ov-tile-top">
+          <div class="ov-tile-icon" style="background:var(--amber-dim);border-color:rgba(245,158,11,.25)">📅</div>
+          <span class="ov-tile-trend" style="color:var(--amber);background:var(--amber-dim);border-color:rgba(245,158,11,.22)">${sum.soon===0?'Clear':'Upcoming'}</span>
+        </div>
+        <div class="ov-tile-val" style="color:var(--amber)">${sum.soon}</div>
+        <div class="ov-tile-lbl">Due ≤ 14 Days</div>
+        <div class="ov-tile-sub" style="color:${sum.soon>0?'var(--amber)':'var(--text3)'}">${sum.soon===0?'No upcoming':'Schedule soon'}</div>
+      </div>
+
+    </div><!-- /row1 -->
+
+    <!-- ROW 2 -->
+    <div class="ov-row2">
+
+      <!-- Alerts panel -->
+      <div class="ov-panel">
+        <div class="ov-panel-hdr">
+          <div class="ov-panel-title">🚦 Station Alerts
+            <span class="ov-panel-badge" style="color:${alertStn.length>0?'var(--red)':'var(--green)'};background:${alertStn.length>0?'var(--red-dim)':'var(--green-dim)'};border-color:${alertStn.length>0?'rgba(239,68,68,.22)':'rgba(0,229,160,.22)'}">${alertStn.length}</span>
+          </div>
+        </div>
+        ${alertStn.length===0
+          ?`<div style="text-align:center;padding:20px;color:var(--text3);font-size:12px">✓ All stations healthy</div>`
+          :alertStn.map(s=>{
+            const h=hlth(s),hc=HC[h];
+            return`<div class="ov-stn-row" onclick="openModal(${s.id})">
+              <span class="ov-stn-pip" style="background:${HX[h]};box-shadow:0 0 5px ${HX[h]}88"></span>
+              <span class="ov-stn-name">${s.name}</span>
+              <span class="ov-stn-badge" style="color:${hc};background:${hc}18;border-color:${hc}33">${h}</span>
+            </div>`;
+          }).join('')}
+      </div>
+
+      <!-- Recent inspections panel -->
+      <div class="ov-panel">
+        <div class="ov-panel-hdr">
+          <div class="ov-panel-title">📋 Recent Inspections</div>
+          <span class="ov-panel-badge" style="color:var(--blue);background:var(--blue-dim);border-color:rgba(96,165,250,.22)">${allCL.length} total</span>
+        </div>
+        ${recent5.length===0
+          ?`<div style="text-align:center;padding:20px;color:var(--text3);font-size:12px">No inspections logged yet</div>`
+          :recent5.map(c=>`<div class="ov-stn-row" onclick="openModal(${c.stId})">
+            <span class="ov-stn-pip" style="background:${c.failCount>0?'var(--red)':'var(--green)'};box-shadow:0 0 5px ${c.failCount>0?'rgba(239,68,68,.7)':'rgba(0,229,160,.7)'}"></span>
+            <div style="flex:1;min-width:0">
+              <div class="ov-stn-name">${c.stName}</div>
+              <div style="font-size:10px;color:var(--text3);font-family:var(--fm);margin-top:1px">${c.date} · ${c.techName}</div>
+            </div>
+            ${c.failCount>0
+              ?`<span class="ov-stn-badge" style="color:var(--red);background:var(--red-dim);border-color:rgba(239,68,68,.25)">✗ ${c.failCount}</span>`
+              :`<span class="ov-stn-badge" style="color:var(--green);background:var(--green-dim);border-color:rgba(0,229,160,.25)">✓ Clear</span>`}
+          </div>`).join('')}
+      </div>
+
+      <!-- Upcoming tests panel -->
+      <div class="ov-panel">
+        <div class="ov-panel-hdr">
+          <div class="ov-panel-title">📅 Upcoming Tests</div>
+          <span class="ov-panel-badge" style="color:var(--amber);background:var(--amber-dim);border-color:rgba(245,158,11,.22)">${sum.overdue} overdue</span>
+        </div>
+        ${upcoming.length===0
+          ?`<div style="text-align:center;padding:20px;color:var(--text3);font-size:12px">No scheduled tests</div>`
+          :upcoming.map(s=>{
+            const d=s.days;
+            const dc=d<0?'var(--red)':d<14?'var(--amber)':'var(--text3)';
+            const dl=d<0?`${Math.abs(d)}d overdue`:d===0?'Today':`${d}d`;
+            return`<div class="ov-stn-row" onclick="startEdit(${s.id})">
+              <span class="ov-stn-pip" style="background:${d<0?'#ef4444':d<14?'#f59e0b':'#00e5a0'};box-shadow:0 0 5px ${d<0?'rgba(239,68,68,.7)':d<14?'rgba(245,158,11,.7)':'rgba(0,229,160,.5)'}"></span>
+              <span class="ov-stn-name">${s.name}</span>
+              <span class="ov-stn-meta" style="color:${dc};font-weight:700">${dl}</span>
+            </div>`;
+          }).join('')}
+      </div>
+
+    </div><!-- /row2 -->
+  </div>`;
+
+  // ── filtered stations ──────────────────────────────────────────
+  const filtered=DB.stations.filter(s=>{
+    const h=hlth(s);
+    return(S.filterH==='All'||h===S.filterH)
+        &&(S.search===''||s.name.toLowerCase().includes(S.search.toLowerCase()));
+  });
+
+  // ── station cards ──────────────────────────────────────────────
+  const cards=filtered.map((s,i)=>{
+    const h=hlth(s),hc=HX[h],days=dLeft(s.nextTest);
+    const checks=DB.checklists[s.id]||[],last=checks.length?checks[checks.length-1]:null;
+    const fails=last?last.items.filter(x=>x.result==='Fail'):[];
+    const docs=DB.documents[s.id]||[];
+    const hbg=h==='Healthy'?'rgba(0,229,160,.07)':h==='Warning'?'rgba(245,158,11,.07)':'rgba(239,68,68,.07)';
+    const hbc=h==='Healthy'?'rgba(0,229,160,.25)':h==='Warning'?'rgba(245,158,11,.25)':'rgba(239,68,68,.25)';
+
+    if(S.editId===s.id) return`<div class="st-card add-card fu" style="animation-delay:${i*14}ms">
+      <div style="font-size:11px;font-weight:700;color:var(--green);font-family:var(--fm);letter-spacing:.08em;margin-bottom:13px">✏ EDITING STATION</div>
+      ${formHTML(S.editData,'edit')}
+      <div style="display:flex;gap:8px;margin-top:13px">
+        <button class="btn btn-primary" onclick="saveStation()">Save Changes</button>
+        <button class="btn btn-ghost" onclick="cancelEdit()">Cancel</button>
+      </div></div>`;
+
+    return`<div class="st-card fu" style="border-color:${hc}18;animation-delay:${i*14}ms">
+      <div class="st-accent" style="background:${hc}"></div>
+      <div class="st-shimmer" style="background:linear-gradient(${hc},transparent)"></div>
+      <div class="st-head">
+        <div style="flex:1;min-width:0;margin-right:8px">
+          <div class="st-name">${s.name}</div>
+          <div class="st-id">F&amp;G Station · ${fDate(s.lastInsp)||'Never inspected'}</div>
+        </div>
+        <div class="h-chip" style="background:${hbg};color:${hc};border-color:${hbc}">
+          <div class="h-pip" style="background:${hc};box-shadow:0 0 5px ${hc}"></div>${h}
+        </div>
+      </div>
+      <div class="trio">
+        ${[['Detector',s.det],['Battery',s.bat],['Power',s.pwr]].map(([l,v])=>`
+          <div class="trio-cell"><div class="trio-lbl">${l}</div>${badge(v)}</div>`).join('')}
+      </div>
+      <div class="date-row">
+        <div class="date-cell">Last Test<span>${fDate(s.lastTest)}</span></div>
+        <div class="date-cell">Next Test<span style="color:${days!==null&&days<0?'var(--red)':days!==null&&days<14?'var(--amber)':'var(--text)'}">${fDate(s.nextTest)}${days!==null?` <span style="font-size:10px">(${dtag(days).replace(/<[^>]+>/g,'')})</span>`:''}</span></div>
+      </div>
+      ${s.notes?`<div class="note-pill">📝 ${s.notes}</div>`:''}
+      <div class="cl-box">
+        <div class="cl-box-row">
+          <div>
+            <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;font-family:var(--fm);margin-bottom:3px">Last Inspection</div>
+            ${last?`<div class="cl-date">${last.date}</div><div class="cl-tech">${last.techName}</div>`:`<div style="font-size:11px;color:var(--text3)">No inspection yet</div>`}
+          </div>
+          <div class="cl-chips">
+            ${last&&last.failCount>0?`<span class="cl-chip" style="color:var(--red);background:var(--red-mid);border-color:rgba(239,68,68,.3)">✗ ${last.failCount}</span>`:''}
+            ${last&&last.failCount===0?`<span class="cl-chip" style="color:var(--green);background:var(--green-mid);border-color:rgba(0,229,160,.3)">✓ Clear</span>`:''}
+            <span style="font-size:10px;color:var(--text3);font-family:var(--fm)">${checks.length}×</span>
+            ${docs.length>0?`<span style="font-size:10px;color:var(--blue);background:var(--blue-dim);border:1px solid rgba(96,165,250,.2);border-radius:5px;padding:2px 7px;font-family:var(--fm)">📎${docs.length}</span>`:''}
+          </div>
+        </div>
+        ${fails.length>0?`<div class="issue-pills">
+          ${fails.slice(0,3).map(x=>`<span class="issue-pill" title="${x.label}">↳ ${x.label}</span>`).join('')}
+          ${fails.length>3?`<span style="font-size:9px;color:var(--text3)">+${fails.length-3} more</span>`:''}
+        </div>`:''}
+      </div>
+      <div class="card-actions">
+        <button class="mbtn mbtn-cl" style="flex:1" onclick="openModal(${s.id})">📋 Checklist ${checks.length>0?`(${checks.length})`:''}</button>
+        <button class="mbtn mbtn-ed" onclick="startEdit(${s.id})">Edit</button>
+        <button class="mbtn mbtn-del" onclick="delStation(${s.id})">Del</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  // ── table rows ──────────────────────────────────────────────────
+  const tblRows=filtered.map(s=>{
+    const h=hlth(s),hc=HX[h],days=dLeft(s.nextTest);
+    const checks=DB.checklists[s.id]||[],last=checks.length?checks[checks.length-1]:null;
+    const docs=DB.documents[s.id]||[];
+    return`<tr>
+      <td style="color:var(--text);font-weight:600;font-family:var(--fh);font-size:13px">${s.name}</td>
+      <td><span style="display:inline-flex;align-items:center;gap:5px;color:${hc};font-weight:700;font-size:11px;font-family:var(--fm)">${pip(h)} ${h}</span></td>
+      <td>${badge(s.det)}</td><td>${badge(s.bat)}</td><td>${badge(s.pwr)}</td>
+      <td style="color:${days!==null&&days<0?'var(--red)':days!==null&&days<14?'var(--amber)':'var(--text)'};font-family:var(--fm);font-size:11px;white-space:nowrap">${fDate(s.nextTest)}</td>
+      <td>${dtag(days)}</td>
+      <td style="font-size:11px;color:var(--text3);white-space:nowrap;font-family:var(--fm)">${last?`${last.date} · ${last.techName}`:'—'}</td>
+      <td>${last?(last.failCount>0?`<span style="color:var(--red);font-weight:700;font-family:var(--fm)">✗ ${last.failCount}</span>`:`<span style="color:var(--green);font-weight:700">✓</span>`):'<span style="color:var(--text3)">—</span>'}</td>
+      <td style="color:var(--blue);font-size:11px;font-family:var(--fm)">${docs.length}</td>
+      <td><div style="display:flex;gap:5px">
+        <button class="mbtn mbtn-cl" onclick="openModal(${s.id})">📋 ${checks.length||''}</button>
+        <button class="mbtn mbtn-ed" onclick="startEdit(${s.id})">Edit</button>
+        <button class="mbtn mbtn-del" onclick="delStation(${s.id})">Del</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+
+  // ── render ──────────────────────────────────────────────────────
+  document.getElementById('app').innerHTML=`
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-logo">🔥</div>
+      <div class="brand-text">
+        <div class="brand-title">OQGN F&amp;G SYSTEM HEALTH</div>
+        <div class="brand-sub">Natural Gas Field · Fire &amp; Gas Monitoring</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <button class="btn-theme" onclick="toggleTheme()">
+        <span class="lbl-light">☀️ Light</span>
+        <span class="lbl-dark">🌙 Dark</span>
+      </button>
+      <button class="btn btn-icon" onclick="exportXL()">📥 Export</button>
+      <button class="btn btn-save" onclick="saveShare()">💾 Save &amp; Share</button>
+      <button class="btn btn-load" onclick="loadLatest()">↻ Load Latest</button>
+      <input class="inp" style="width:140px;font-size:12px" placeholder="Your name…" value="${S.updater}" oninput="S.updater=this.value">
+    </div>
+  </div>
+
+  <div class="infobar">
+    <div><span class="infobar-dot" style="background:var(--green);box-shadow:0 0 7px var(--green)"></span>
+      Local storage · ${new Date().toLocaleDateString('en-GB',{weekday:'short',day:'2-digit',month:'short',year:'numeric'})} · ${DB.stations.length} stations · ${CL_ALL.length} checklist items
+    </div>
+    <div class="infobar-hint"><strong>💾 Save &amp; Share</strong> → save fg_data.json to shared folder &nbsp;·&nbsp; <strong>↻ Load</strong> → pull teammates' updates</div>
+  </div>
+
+  <div class="main">
+
+    ${ovHTML}
+
+    <div class="sect-divider">
+      <div class="sect-divider-title">Station Management</div>
+      <div class="sect-divider-line"></div>
+      <button class="btn btn-primary" onclick="S.addMode=!S.addMode;render()" style="font-size:12px;padding:6px 14px;flex-shrink:0">＋ Add Station</button>
+    </div>
+
+    <div class="controls">
+      <input class="inp" style="width:190px" placeholder="🔍  Search stations…" value="${S.search}" oninput="S.search=this.value;render()">
+      <select class="sel" onchange="S.filterH=this.value;render()">
+        ${['All','Healthy','Warning','Critical'].map(h=>`<option${S.filterH===h?' selected':''}>${h}</option>`).join('')}
+      </select>
+      <div class="tab-wrap">
+        <button class="tab-btn" onclick="S.tab='grid';render()" style="background:${S.tab==='grid'?'rgba(0,229,160,.1)':'var(--s2)'};color:${S.tab==='grid'?'var(--green)':'var(--text3)'};border-right:1px solid var(--border2)">⊞ Grid</button>
+        <button class="tab-btn" onclick="S.tab='table';render()" style="background:${S.tab==='table'?'rgba(0,229,160,.1)':'var(--s2)'};color:${S.tab==='table'?'var(--green)':'var(--text3)'}">☰ Table</button>
+      </div>
+      <span style="font-family:var(--fm);font-size:11px;color:var(--text3);margin-left:4px">${filtered.length} of ${DB.stations.length} stations</span>
+    </div>
+
+    ${S.addMode?`<div class="add-card fu">
+      <div style="font-family:var(--fh);font-size:16px;font-weight:700;color:var(--green);letter-spacing:.05em;margin-bottom:15px">＋ New Station</div>
+      ${formHTML(S.newStn,'new')}
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button class="btn btn-primary" onclick="saveStation()">Save Station</button>
+        <button class="btn btn-ghost" onclick="S.addMode=false;render()">Cancel</button>
+      </div>
+    </div>`:''}
+
+    ${S.tab==='grid'?`<div class="st-grid">${cards||`<div class="empty" style="grid-column:1/-1"><span class="empty-ico">🔍</span>No stations match.</div>`}</div>`:''}
+
+    ${S.tab==='table'?`<div class="tbl-wrap"><table>
+      <thead><tr>
+        <th>Station</th><th>Health</th><th>Detector</th><th>Battery</th><th>Power</th>
+        <th>Next Test</th><th>Days</th><th>Last Inspection</th><th>Issues</th><th>Docs</th><th>Actions</th>
+      </tr></thead>
+      <tbody>${tblRows||`<tr><td colspan="11" style="text-align:center;color:var(--text3);padding:40px">No stations match.</td></tr>`}</tbody>
+    </table></div>`:''}
+
+    <div class="legend">
+      <span style="color:var(--text2);font-weight:600">Legend:</span>
+      ${Object.entries(HX).map(([k,c])=>`<span style="display:inline-flex;align-items:center;gap:5px">${pip(k)} ${k}</span>`).join('')}
+      <span style="color:var(--border2)">|</span>
+      ${['OK','Fault','Offline','Low'].map(k=>badge(k)).join(' ')}
+    </div>
+  </div>
+  <div id="modal-root"></div>`;
+
+  if(S.modal)renderModal();
+}
+
+render();
+</script>
+</body>
+</html>
